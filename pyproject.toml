@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-photowalk = "photowalk:main"
+photowalk = "photowalk.cli:main"
 
 [build-system]
 requires = ["hatchling"]
