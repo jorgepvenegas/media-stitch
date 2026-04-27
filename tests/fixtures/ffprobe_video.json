@@ -1,0 +1,15 @@
+{
+  "format": {
+    "filename": "/tmp/video.mp4",
+    "duration": "330.500000",
+    "tags": {
+      "creation_time": "2024-07-15T14:00:00.000000Z"
+    }
+  },
+  "streams": [
+    {
+      "codec_type": "video",
+      "duration": "330.500000"
+    }
+  ]
+}

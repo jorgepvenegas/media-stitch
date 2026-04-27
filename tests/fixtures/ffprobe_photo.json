@@ -1,0 +1,14 @@
+{
+  "format": {
+    "filename": "/tmp/photo.jpg",
+    "tags": {
+      "creation_time": "2024-07-15T14:32:10.000000Z",
+      "Make": "Canon",
+      "Model": "EOS R6",
+      "ExposureTime": "1/250",
+      "ISOSpeedRatings": "400",
+      "FocalLength": "35mm"
+    }
+  },
+  "streams": []
+}
