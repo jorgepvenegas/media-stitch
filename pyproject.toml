@@ -1,0 +1,25 @@
+[project]
+name = "photowalk"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jorge Venegas", email = "jorgepvenegas@protonmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.3.3",
+]
+
+[project.scripts]
+photowalk = "photowalk:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
