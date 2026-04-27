@@ -13,23 +13,35 @@ _TAG_MAP = {
     "Make": "make",
     "Model": "model",
     "ExposureTime": "shutter_speed",
+    "ShutterSpeedValue": "shutter_speed_apex",  # fallback only
     "ISOSpeedRatings": "iso",
     "PhotographicSensitivity": "iso",
     "FocalLength": "focal_length",
 }
 
 
-def _format_exposure_time(value) -> str:
-    """Format ExposureTime as human-readable string."""
+def _format_exposure_time(value) -> Optional[str]:
+    """Format ExposureTime as human-readable string like '1/250'."""
     if isinstance(value, tuple) and len(value) == 2:
         num, den = value
         if num == 1:
             return f"1/{den}"
         return f"{num}/{den}"
-    return str(value)
+    # Try to convert to float (handles IFDRational, float, int)
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return None
+    if seconds == 0:
+        return None
+    if seconds >= 1:
+        return f"{seconds:g}s"
+    # Convert to fraction: 0.004 -> 1/250
+    den = round(1 / seconds)
+    return f"1/{den}"
 
 
-def _format_focal_length(value) -> str:
+def _format_focal_length(value) -> Optional[str]:
     """Format FocalLength with mm suffix."""
     if isinstance(value, tuple) and len(value) == 2:
         num, den = value
@@ -38,6 +50,37 @@ def _format_focal_length(value) -> str:
     if isinstance(value, (int, float)):
         return f"{value:.0f}mm" if value == int(value) else f"{value:.1f}mm"
     return str(value)
+
+
+def _extract_ifd(exif_dict) -> dict:
+    """Extract mapped fields from a single EXIF IFD dictionary."""
+    result = {}
+    for tag_id, value in exif_dict.items():
+        tag_name = ExifTags.TAGS.get(tag_id, str(tag_id))
+        field = _TAG_MAP.get(tag_name)
+        if field is None:
+            continue
+
+        if field == "timestamp":
+            if isinstance(value, str):
+                # EXIF DateTime format: "2024:07:15 14:32:10"
+                result[field] = value.replace(":", "-", 2)
+        elif field == "make":
+            result["make"] = str(value).strip()
+        elif field == "model":
+            result["model"] = str(value).strip()
+        elif field == "shutter_speed":
+            formatted = _format_exposure_time(value)
+            if formatted:
+                result["shutter_speed"] = formatted
+        elif field == "iso":
+            try:
+                result["iso"] = int(value)
+            except (ValueError, TypeError):
+                pass
+        elif field == "focal_length":
+            result["focal_length"] = _format_focal_length(value)
+    return result
 
 
 def extract_photo_exif(path: Path) -> dict:
@@ -53,29 +96,15 @@ def extract_photo_exif(path: Path) -> dict:
             if exif is None:
                 return result
 
-            for tag_id, value in exif.items():
-                tag_name = ExifTags.TAGS.get(tag_id, str(tag_id))
-                field = _TAG_MAP.get(tag_name)
-                if field is None:
-                    continue
+            # Primary IFD
+            result.update(_extract_ifd(exif))
 
-                if field == "timestamp":
-                    # EXIF DateTime format: "2024:07:15 14:32:10"
-                    if isinstance(value, str):
-                        result[field] = value.replace(":", "-", 2)
-                elif field == "make":
-                    result[field] = str(value).strip()
-                elif field == "model":
-                    result[field] = str(value).strip()
-                elif field == "shutter_speed":
-                    result[field] = _format_exposure_time(value)
-                elif field == "iso":
-                    try:
-                        result[field] = int(value)
-                    except (ValueError, TypeError):
-                        pass
-                elif field == "focal_length":
-                    result[field] = _format_focal_length(value)
+            # Exif IFD (contains camera settings: ExposureTime, ISO, FocalLength, etc.)
+            exif_offset = exif.get(0x8769)
+            if exif_offset:
+                exif_ifd = exif.get_ifd(0x8769)
+                if exif_ifd:
+                    result.update(_extract_ifd(exif_ifd))
     except Exception:
         pass
 
