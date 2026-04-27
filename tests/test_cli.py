@@ -7,22 +7,18 @@ from photowalk.cli import main
 
 
 def test_info_photo():
-    mock_result = {
-        "format": {
-            "tags": {
-                "creation_time": "2024-07-15T14:32:10.000000Z",
-                "Model": "EOS R6",
-                "ExposureTime": "1/250",
-                "ISOSpeedRatings": "400",
-                "FocalLength": "35mm",
-            }
-        }
+    mock_exif = {
+        "timestamp": "2024-07-15 14:32:10",
+        "model": "EOS R6",
+        "shutter_speed": "1/250",
+        "iso": 400,
+        "focal_length": "35mm",
     }
 
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("photo.jpg").touch()
-        with patch("photowalk.api.run_ffprobe", return_value=mock_result):
+        with patch("photowalk.api.extract_photo_exif", return_value=mock_exif):
             result = runner.invoke(main, ["info", "photo.jpg"])
 
     assert result.exit_code == 0
@@ -31,7 +27,7 @@ def test_info_photo():
 
 
 def test_info_video():
-    mock_result = {
+    mock_ffprobe = {
         "format": {
             "duration": "120.0",
             "tags": {"creation_time": "2024-07-15T14:00:00.000000Z"}
@@ -41,7 +37,7 @@ def test_info_video():
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("video.mp4").touch()
-        with patch("photowalk.api.run_ffprobe", return_value=mock_result):
+        with patch("photowalk.api.run_ffprobe", return_value=mock_ffprobe):
             result = runner.invoke(main, ["info", "video.mp4"])
 
     assert result.exit_code == 0
@@ -59,19 +55,15 @@ def test_info_unsupported():
 
 
 def test_batch_json():
-    mock_photo = {
-        "format": {
-            "tags": {
-                "creation_time": "2024-07-15T14:32:10.000000Z",
-                "Model": "EOS R6",
-            }
-        }
+    mock_exif = {
+        "timestamp": "2024-07-15 14:32:10",
+        "model": "EOS R6",
     }
 
     runner = CliRunner()
     with runner.isolated_filesystem():
         Path("photo.jpg").touch()
-        with patch("photowalk.api.run_ffprobe", return_value=mock_photo):
+        with patch("photowalk.api.extract_photo_exif", return_value=mock_exif):
             result = runner.invoke(main, ["batch", ".", "--output", "json"])
 
     assert result.exit_code == 0

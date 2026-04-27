@@ -7,6 +7,21 @@ from typing import Optional
 from photowalk.models import PhotoMetadata, VideoMetadata
 
 
+def _build_camera_model(make: str, model: str) -> Optional[str]:
+    """Combine make and model, avoiding duplication when model already contains make."""
+    make = make.strip()
+    model = model.strip()
+    if not make and not model:
+        return None
+    if not make:
+        return model or None
+    if not model:
+        return make or None
+    if model.lower().startswith(make.lower()):
+        return model
+    return f"{make} {model}"
+
+
 def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
     """Parse an ISO-8601 timestamp string into a datetime."""
     if not value:
@@ -33,11 +48,10 @@ def parse_photo(path: Path, data: dict) -> PhotoMetadata:
 
     timestamp = _parse_timestamp(_get_tag(data, "creation_time", "date"))
 
-    make = tags.get("Make", "")
-    model = tags.get("Model", "")
-    camera_model = None
-    if make or model:
-        camera_model = " ".join(part for part in [make, model] if part).strip() or None
+    camera_model = _build_camera_model(
+        tags.get("Make", ""),
+        tags.get("Model", ""),
+    )
 
     shutter_speed = _get_tag(data, "ExposureTime", "ShutterSpeedValue")
 
@@ -58,6 +72,35 @@ def parse_photo(path: Path, data: dict) -> PhotoMetadata:
         shutter_speed=shutter_speed,
         iso=iso,
         focal_length=focal_length,
+    )
+
+
+def parse_photo_from_exif(path: Path, data: dict) -> PhotoMetadata:
+    """Parse Pillow EXIF dict into PhotoMetadata.
+
+    Expected data keys: timestamp, make, model, shutter_speed, iso, focal_length
+    """
+    timestamp = None
+    ts_raw = data.get("timestamp")
+    if ts_raw:
+        # EXIF DateTime format: "2024-07-15 14:32:10" (already normalized from "2024:07:15")
+        try:
+            timestamp = datetime.strptime(ts_raw, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass
+
+    camera_model = _build_camera_model(
+        data.get("make", ""),
+        data.get("model", ""),
+    )
+
+    return PhotoMetadata(
+        source_path=path,
+        timestamp=timestamp,
+        camera_model=camera_model,
+        shutter_speed=data.get("shutter_speed"),
+        iso=data.get("iso"),
+        focal_length=data.get("focal_length"),
     )
 
 
