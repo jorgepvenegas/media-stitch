@@ -10,16 +10,16 @@ from photowalk.timeline import TimelineEntry, TimelineMap
 
 
 def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
-    """Write an ffmpeg concat demuxer list file."""
+    """Write an ffmpeg concat demuxer list file.
+
+    Each entry is a pre-rendered clip with its own embedded duration, so we
+    emit one `file` line per entry — no `duration` directives, no trailing
+    duplicate (those are only needed when concatenating still-image inputs).
+    """
     lines = []
     for entry in entries:
         path = entry.clip_path or entry.source_path
         lines.append(f"file '{path.resolve()}'")
-        lines.append(f"duration {entry.duration_seconds}")
-    # ffmpeg concat demuxer requires a final file line without duration
-    if entries:
-        last_path = entries[-1].clip_path or entries[-1].source_path
-        lines.append(f"file '{last_path.resolve()}'")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines) + "\n")
@@ -74,6 +74,8 @@ def _split_video_segment(
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "48000",
+        "-r", "30",
+        "-video_track_timescale", "15360",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
         str(output_path),
@@ -130,6 +132,8 @@ def stitch(
         ok = run_concat(concat_list_path, output_path)
         return ok
     finally:
-        if not keep_temp:
+        if keep_temp:
+            print(f"Temp files preserved at: {temp_dir}")
+        else:
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)

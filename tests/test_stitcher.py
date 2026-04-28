@@ -53,15 +53,23 @@ def test_build_concat_list_uses_source_path_when_no_clip_path():
         assert "video.mp4" in content
 
 
-def test_build_concat_list_repeats_last_file():
-    """ffmpeg concat demuxer requires the last file entry to appear twice."""
+def test_build_concat_list_no_duration_or_trailing_duplicate():
+    """Pre-rendered clips have embedded duration; the list should be one
+    `file` line per entry, no `duration` directives, no trailing duplicate."""
     entries = [
         TimelineEntry(
             start_time=datetime(2024, 7, 15, 12, 0, 0),
             duration_seconds=5.0,
             kind="video_segment",
-            source_path=Path("only.mp4"),
-            clip_path=Path("only.mp4"),
+            source_path=Path("a.mp4"),
+            clip_path=Path("a.mp4"),
+        ),
+        TimelineEntry(
+            start_time=datetime(2024, 7, 15, 12, 0, 5),
+            duration_seconds=3.5,
+            kind="image",
+            source_path=Path("b.jpg"),
+            clip_path=Path("b.mp4"),
         ),
     ]
 
@@ -70,8 +78,9 @@ def test_build_concat_list_repeats_last_file():
         build_concat_list(entries, list_path)
 
         content = list_path.read_text()
-        # "only.mp4" should appear twice (once with duration, once as trailing file)
-        assert content.count("only.mp4") == 2
+        assert "duration" not in content
+        assert content.count("a.mp4") == 1
+        assert content.count("b.mp4") == 1
 
 
 def test_run_concat_command():
