@@ -43,6 +43,22 @@ photowalk batch ~/Photos/2024/ --output csv --recursive
 photowalk batch ~/Photos/2024/ --no-include-videos
 ```
 
+### Sync timestamps
+
+```bash
+# Preview changes with dry-run
+photowalk sync ~/Photos/2024/ --offset "-8h23m5s" --recursive --dry-run
+
+# Apply offset with confirmation
+photowalk sync ~/Photos/2024/ --offset "-8h23m5s" --recursive
+
+# Use a reference timestamp pair
+photowalk sync ~/Photos/2024/ --reference "2026-04-27T23:28:01+00:00=2026-04-27T07:05:00" --recursive
+
+# Skip confirmation prompt
+photowalk sync ~/Photos/2024/ --offset "+2h" --recursive --yes
+```
+
 ## Library Usage
 
 ```python
