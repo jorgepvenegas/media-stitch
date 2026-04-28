@@ -67,6 +67,27 @@ def test_generate_image_clip_returns_false_on_image_open_error():
     assert result is False
 
 
+def test_generate_image_clip_uses_custom_preset_and_crf():
+    with patch("photowalk.image_clip.Image.open") as mock_open:
+        mock_img = MagicMock()
+        mock_img.size = (1920, 1080)
+        mock_open.return_value.__enter__.return_value = mock_img
+
+        with patch("photowalk.image_clip.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = generate_image_clip(
+                Path("photo.jpg"), Path("clip.mp4"), 1920, 1080,
+                preset="ultrafast", crf=28,
+            )
+
+    assert result is True
+    cmd = mock_run.call_args[0][0]
+    preset_idx = cmd.index("-preset")
+    assert cmd[preset_idx + 1] == "ultrafast"
+    crf_idx = cmd.index("-crf")
+    assert cmd[crf_idx + 1] == "28"
+
+
 def test_generate_image_clip_raises_runtime_error_when_ffmpeg_missing():
     with patch("photowalk.image_clip.Image.open") as mock_open:
         mock_img = MagicMock()

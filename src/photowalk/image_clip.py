@@ -23,6 +23,8 @@ def generate_image_clip(
     frame_width: int,
     frame_height: int,
     duration: float = 3.5,
+    preset: str = "fast",
+    crf: int = 23,
 ) -> bool:
     """Generate a video clip with white background and centered image."""
     try:
@@ -50,6 +52,8 @@ def generate_image_clip(
         "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
         "-vf", filter_str,
         "-c:v", "libx264",
+        "-preset", preset,
+        "-crf", str(crf),
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "48000",
