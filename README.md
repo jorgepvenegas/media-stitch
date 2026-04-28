@@ -67,6 +67,21 @@ photowalk sync ~/Photos/2024/ --offset "+2h" --recursive --yes
 - **Duration string:** `[-][Nh][Nm][Ns]` — e.g. `-8h23m5s`, `+2h`, `-30m`
 - **Reference pair:** `wrong=correct` — e.g. `2026-04-27T23:28:01+00:00=2026-04-27T07:05:00`
 
+### Fix trimmed video timestamps
+
+When a video is trimmed in an external editor, the trimmed file loses its original creation time. This command auto-detects the trim offset by comparing audio waveforms via cross-correlation, then writes the corrected timestamp.
+
+```bash
+# Preview the detected offset and computed timestamp
+photowalk fix-trim original.mp4 trimmed.mp4 --dry-run
+
+# Update the trimmed file in place
+photowalk fix-trim original.mp4 trimmed.mp4
+
+# Write to a new file instead
+photowalk fix-trim original.mp4 trimmed.mp4 -o fixed.mp4
+```
+
 ## Library Usage
 
 ```python
@@ -96,10 +111,11 @@ uv run pytest --cov
 | Module | Purpose |
 |--------|---------|
 | `src/photowalk/api.py` | High-level `extract_metadata()` API |
-| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync` commands) |
+| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync`, `fix-trim` commands) |
 | `src/photowalk/models.py` | `PhotoMetadata` and `VideoMetadata` dataclasses |
 | `src/photowalk/photo_extractors.py` | Pillow-based photo EXIF extraction |
 | `src/photowalk/extractors.py` | ffprobe subprocess wrapper for videos |
 | `src/photowalk/parsers.py` | Parse raw EXIF/ffprobe output into typed models |
 | `src/photowalk/offset.py` | Parse `--offset` and `--reference` into `timedelta` |
+| `src/photowalk/offset_detector.py` | Audio cross-correlation for trim offset detection |
 | `src/photowalk/writers.py` | Write timestamps back via piexif (photos) / ffmpeg (videos) |
