@@ -30,6 +30,27 @@ def _make_mock_timeline():
     )
 
 
+def test_stitch_draft_flag():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("video.mp4").touch()
+        Path("photo.jpg").touch()
+
+        mock_timeline = _make_mock_timeline()
+
+        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+            with patch("photowalk.cli.stitch") as mock_stitch:
+                mock_stitch.return_value = True
+                result = runner.invoke(main, [
+                    "stitch", ".", "--output", "out.mp4", "--draft"
+                ])
+
+    assert result.exit_code == 0
+    mock_stitch.assert_called_once()
+    _, kwargs = mock_stitch.call_args
+    assert kwargs["draft"] is True
+
+
 def test_stitch_dry_run():
     runner = CliRunner()
     with runner.isolated_filesystem():
