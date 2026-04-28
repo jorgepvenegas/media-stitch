@@ -6,7 +6,7 @@ A Python CLI tool and library for extracting and synchronizing timestamps and ca
 
 - **Photos:** EXIF extraction via Pillow, timestamp writing via piexif
 - **Videos:** Metadata extraction and writing via ffmpeg/ffprobe
-- **CLI:** Click-based with `info`, `batch`, `sync`, and `fix-trim` commands
+- **CLI:** Click-based with `info`, `batch`, `sync`, `fix-trim`, and `stitch` commands
 
 ## Tech Stack
 
@@ -23,7 +23,7 @@ A Python CLI tool and library for extracting and synchronizing timestamps and ca
 src/photowalk/
 ├── __init__.py          # Public API exports
 ├── api.py               # High-level extract_metadata(path) → PhotoMetadata|VideoMetadata
-├── cli.py               # Click CLI commands: info, batch, sync
+├── cli.py               # Click CLI commands: info, batch, sync, stitch
 ├── models.py            # PhotoMetadata, VideoMetadata dataclasses with to_dict()
 ├── constants.py         # PHOTO_EXTENSIONS, VIDEO_EXTENSIONS sets
 ├── photo_extractors.py  # Pillow-based EXIF reading
@@ -31,6 +31,9 @@ src/photowalk/
 ├── parsers.py           # Parse raw EXIF/ffprobe JSON into typed models
 ├── offset.py            # Parse --offset and --reference into timedelta
 ├── offset_detector.py   # Audio cross-correlation for trim offset detection
+├── timeline.py          # Build sorted timeline map from photos and videos
+├── image_clip.py        # Generate white-background video clips from photos
+├── stitcher.py          # Split videos and assemble final output via ffmpeg concat
 └── writers.py           # Write timestamps: piexif (photos), ffmpeg (videos)
 
 tests/
@@ -38,6 +41,7 @@ tests/
 ├── test_cli.py
 ├── test_cli_fix_trim.py
 ├── test_cli_sync.py
+├── test_cli_stitch.py
 ├── test_models.py
 ├── test_constants.py
 ├── test_photo_extractors.py
@@ -45,6 +49,9 @@ tests/
 ├── test_parsers.py
 ├── test_offset.py
 ├── test_offset_detector.py
+├── test_timeline.py
+├── test_image_clip.py
+├── test_stitcher.py
 ├── test_writers.py
 └── fixtures/            # Sample ffprobe JSON for parser tests
 ```
@@ -65,6 +72,9 @@ tests/
 - **Write photos:** Use `write_photo_timestamp(path, datetime)` from `writers.py`
 - **Write videos:** Use `write_video_timestamp(path, datetime)` from `writers.py`
 - **Detect trim offset:** Use `detect_trim_offset(original, trimmed)` from `offset_detector.py`
+- **Build timeline:** Use `build_timeline(files)` from `timeline.py`
+- **Generate image clips:** Use `generate_image_clip(path, output, width, height, duration)` from `image_clip.py`
+- **Stitch videos:** Use `stitch(timeline_map, output, width, height, ...)` from `stitcher.py`
 
 ### Error handling
 
@@ -102,6 +112,7 @@ uv run photowalk info photo.jpg
 uv run photowalk batch ~/Photos/ --recursive
 uv run photowalk sync ~/Photos/ --offset "-2h" --dry-run
 uv run photowalk fix-trim original.mp4 trimmed.mp4 --dry-run
+uv run photowalk stitch ~/Photos/ --output final.mp4 --dry-run
 ```
 
 ## Design Decisions

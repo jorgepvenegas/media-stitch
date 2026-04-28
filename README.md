@@ -1,6 +1,6 @@
 # Photo Walk
 
-Extract and synchronize timestamps and camera metadata from photos and videos.
+Extract and synchronize timestamps and camera metadata from photos and videos. Stitch photos and videos into chronological output videos.
 
 ## Requirements
 
@@ -82,6 +82,27 @@ photowalk fix-trim original.mp4 trimmed.mp4
 photowalk fix-trim original.mp4 trimmed.mp4 -o fixed.mp4
 ```
 
+### Stitch photos and videos into a timeline video
+
+Compose a single chronological video from a directory of photos and videos. Images are displayed as white-background clips inserted at their capture timestamp within or between videos.
+
+```bash
+# Preview the timeline without generating output
+photowalk stitch ~/Photos/2024/ --output final.mp4 --dry-run
+
+# Generate the stitched video (resolution auto-detected from first video)
+photowalk stitch ~/Photos/2024/ --output final.mp4
+
+# Force a specific output resolution
+photowalk stitch ~/Photos/2024/ --output final.mp4 --format 1920x1080
+
+# Change image display duration (default is 3.5 seconds)
+photowalk stitch ~/Photos/2024/ --output final.mp4 --image-duration 5.0
+
+# Keep temporary clips for debugging
+photowalk stitch ~/Photos/2024/ --output final.mp4 --keep-temp
+```
+
 ## Library Usage
 
 ```python
@@ -111,11 +132,14 @@ uv run pytest --cov
 | Module | Purpose |
 |--------|---------|
 | `src/photowalk/api.py` | High-level `extract_metadata()` API |
-| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync`, `fix-trim` commands) |
+| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync`, `fix-trim`, `stitch` commands) |
 | `src/photowalk/models.py` | `PhotoMetadata` and `VideoMetadata` dataclasses |
 | `src/photowalk/photo_extractors.py` | Pillow-based photo EXIF extraction |
 | `src/photowalk/extractors.py` | ffprobe subprocess wrapper for videos |
 | `src/photowalk/parsers.py` | Parse raw EXIF/ffprobe output into typed models |
 | `src/photowalk/offset.py` | Parse `--offset` and `--reference` into `timedelta` |
 | `src/photowalk/offset_detector.py` | Audio cross-correlation for trim offset detection |
+| `src/photowalk/timeline.py` | Build sorted timeline map from photos and videos |
+| `src/photowalk/image_clip.py` | Generate white-background video clips from photos |
+| `src/photowalk/stitcher.py` | Split videos and assemble final output via ffmpeg concat |
 | `src/photowalk/writers.py` | Write timestamps back via piexif (photos) / ffmpeg (videos) |
