@@ -179,6 +179,23 @@ def test_stitch_video_segment():
     assert "pad=" in split_cmd[split_cmd.index("-vf") + 1]
 
 
+def test_split_video_segment_uses_custom_preset_and_crf():
+    from photowalk.stitcher import _split_video_segment
+    with patch("photowalk.stitcher.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        _split_video_segment(
+            Path("in.mp4"), 0.0, 5.0, Path("out.mp4"), 640, 480,
+            preset="ultrafast", crf=28,
+        )
+    cmd = mock_run.call_args[0][0]
+    assert "-preset" in cmd
+    preset_idx = cmd.index("-preset")
+    assert cmd[preset_idx + 1] == "ultrafast"
+    assert "-crf" in cmd
+    crf_idx = cmd.index("-crf")
+    assert cmd[crf_idx + 1] == "28"
+
+
 def test_compute_draft_resolution_scales_down():
     from photowalk.stitcher import _compute_draft_resolution
     assert _compute_draft_resolution(1920, 1080) == (1280, 720)

@@ -67,6 +67,8 @@ def _split_video_segment(
     output_path: Path,
     frame_width: int,
     frame_height: int,
+    preset: str = "fast",
+    crf: int = 23,
 ) -> bool:
     """Extract a segment from a video using ffmpeg trim.
 
@@ -82,8 +84,8 @@ def _split_video_segment(
         "-t", str(duration),
         "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
         "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
+        "-preset", preset,
+        "-crf", str(crf),
         "-c:a", "aac",
         "-b:a", "128k",
         "-ar", "48000",
