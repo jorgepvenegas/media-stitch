@@ -2,7 +2,10 @@
 
 import subprocess
 import tempfile
+import wave
 from pathlib import Path
+
+import numpy as np
 
 
 class OffsetDetectionError(Exception):
@@ -38,3 +41,23 @@ def extract_audio(path: Path) -> Path:
         )
 
     return temp_path
+
+
+def _load_audio(path: Path) -> tuple[np.ndarray, int]:
+    """Load a WAV file as a mono float32 numpy array and return (array, sample_rate)."""
+    with wave.open(str(path), "rb") as wf:
+        nchannels = wf.getnchannels()
+        sampwidth = wf.getsampwidth()
+        framerate = wf.getframerate()
+        nframes = wf.getnframes()
+        data = wf.readframes(nframes)
+
+        if sampwidth == 2:
+            arr = np.frombuffer(data, dtype=np.int16)
+        else:
+            raise OffsetDetectionError(f"Unsupported sample width: {sampwidth}")
+
+        if nchannels > 1:
+            arr = arr.reshape(-1, nchannels).mean(axis=1)
+
+        return arr.astype(np.float32), framerate
