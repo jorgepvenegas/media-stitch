@@ -22,7 +22,7 @@ from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.offset import compute_offset, OffsetError
 from photowalk.offset_detector import detect_trim_offset, OffsetDetectionError
 from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
-from photowalk.timeline import build_timeline
+from photowalk.timeline import build_timeline_from_files
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
 
@@ -264,7 +264,7 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
         click.echo("No media files found.")
         return
 
-    timeline = build_timeline(files)
+    timeline = build_timeline_from_files(files)
     all_entries = timeline.all_entries
 
     if not all_entries:
