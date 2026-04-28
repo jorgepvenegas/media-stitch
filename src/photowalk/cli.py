@@ -379,7 +379,9 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive)
     for entry in all_entries:
         start = entry.start_time.isoformat() if entry.start_time else "N/A"
         name = str(entry.source_path.name)[:40]
-        lines.append(f"{start:<25} {entry.duration_seconds:<10.1f} {entry.kind:<15} {name}")
+        # Images show 0.0 in timeline builder; display their actual clip duration
+        dur = image_duration if entry.kind == "image" else entry.duration_seconds
+        lines.append(f"{start:<25} {dur:<10.1f} {entry.kind:<15} {name}")
     click.echo("\n".join(lines))
 
     if dry_run:
