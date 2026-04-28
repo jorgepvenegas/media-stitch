@@ -388,6 +388,10 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
     if dry_run:
         return
 
+    if draft:
+        from photowalk.stitcher import _compute_draft_resolution
+        frame_width, frame_height = _compute_draft_resolution(frame_width, frame_height)
+
     click.echo(f"\nOutput: {output}")
     click.echo(f"Resolution: {frame_width}x{frame_height}")
     click.echo("Generating clips and stitching...")
