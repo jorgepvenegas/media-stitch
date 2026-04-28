@@ -6,12 +6,14 @@ import uuid
 from pathlib import Path
 from typing import List
 
+from PIL import Image
+
 from photowalk.ffmpeg_config import (
     FfmpegEncodeConfig,
     build_scale_pad_filter,
     ffmpeg_not_found_error,
 )
-from photowalk.image_clip import generate_image_clip
+from photowalk.image_clip import compute_scaled_dimensions, generate_image_clip
 from photowalk.timeline import TimelineEntry, TimelineMap
 
 
@@ -126,6 +128,7 @@ def generate_plan(
     frame_height: int,
     image_duration: float = 3.5,
     draft: bool = False,
+    margin: float = 15.0,
 ) -> dict:
     """Generate a plan dict describing how stitch() would process the timeline."""
     encode_config = _resolve_encode_config(draft)
@@ -138,18 +141,38 @@ def generate_plan(
     for entry in timeline_map.all_entries:
         if entry.kind == "image":
             clip_path = temp_dir / f"img_{entry.source_path.stem}.mp4"
-            vf = build_scale_pad_filter(frame_width, frame_height)
+            # Use placeholder dimensions if image cannot be read (for testing)
+            try:
+                with Image.open(entry.source_path) as img:
+                    img_width, img_height = img.size
+            except Exception:
+                img_width, img_height = frame_width, frame_height
+            scaled_w, scaled_h = compute_scaled_dimensions(
+                img_width, img_height, frame_width, frame_height, margin
+            )
+            vf = (
+                f"color=c=white:s={frame_width}x{frame_height}:d={image_duration}[bg];"
+                f"[0:v]scale={scaled_w}:{scaled_h}[img];"
+                f"[bg][img]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,0,{image_duration})'"
+            )
             cmd = [
                 "ffmpeg", "-y",
                 "-loop", "1",
                 "-i", str(entry.source_path.resolve()),
+                "-f", "lavfi",
+                "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
                 "-t", str(image_duration),
                 "-vf", vf,
                 "-c:v", "libx264",
                 "-preset", encode_config.preset,
                 "-crf", str(encode_config.crf),
+                "-c:a", "aac",
+                "-b:a", encode_config.audio_bitrate,
+                "-ar", str(encode_config.audio_sample_rate),
+                "-r", str(encode_config.fps),
+                "-video_track_timescale", str(encode_config.video_track_timescale),
                 "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
+                "-shortest",
                 str(clip_path),
             ]
             ffmpeg_commands.append({
@@ -234,6 +257,7 @@ def generate_plan(
             "resolution": [frame_width, frame_height],
             "image_duration": image_duration,
             "draft": draft,
+            "margin": margin,
         },
         "timeline": timeline_entries,
         "temp_dir": str(temp_dir),
@@ -249,6 +273,7 @@ def stitch(
     image_duration: float = 3.5,
     keep_temp: bool = False,
     draft: bool = False,
+    margin: float = 15.0,
 ) -> bool:
     """Stitch all segments into a single output video."""
     temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
@@ -267,6 +292,7 @@ def stitch(
                     frame_height,
                     image_duration,
                     encode_config=encode_config,
+                    margin=margin,
                 )
                 if not ok:
                     return False

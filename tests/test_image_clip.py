@@ -5,24 +5,51 @@ from photowalk.image_clip import compute_scaled_dimensions, generate_image_clip
 
 
 def test_scale_landscape_to_landscape():
-    # 4:3 image into 16:9 frame — should fit by height
+    # 4:3 image into 16:9 frame — 70% of frame (15% margin each side)
+    # available = 1344x756, scale = min(1344/4000, 756/3000) = 0.252
     w, h = compute_scaled_dimensions(4000, 3000, 1920, 1080)
-    assert w == 1440
-    assert h == 1080
+    assert w == 1008
+    assert h == 756
 
 
 def test_scale_portrait_to_landscape():
-    # 3:4 image into 16:9 frame — should fit by height
+    # 3:4 image into 16:9 frame — 70% of frame (15% margin each side)
+    # available = 1344x756, scale = min(1344/3000, 756/4000) = 0.189
     w, h = compute_scaled_dimensions(3000, 4000, 1920, 1080)
-    assert w == 810
-    assert h == 1080
+    assert w == 567
+    assert h == 756
 
 
 def test_scale_landscape_to_portrait():
-    # 16:9 image into 9:16 frame — should fit by width
+    # 16:9 image into 9:16 frame — 70% of frame (15% margin each side)
+    # available = 756x1344, scale = min(756/1920, 1344/1080) = 0.39375
     w, h = compute_scaled_dimensions(1920, 1080, 1080, 1920)
-    assert w == 1080
-    assert h == 607
+    assert w == 756
+    assert h == 425
+
+
+def test_scale_portrait_to_portrait():
+    # 3:4 image into 9:16 frame — 70% of frame (15% margin each side)
+    # available = 756x1344, scale = min(756/3000, 1344/4000) = 0.252
+    w, h = compute_scaled_dimensions(3000, 4000, 1080, 1920)
+    assert w == 756
+    assert h == 1008
+
+
+def test_scale_with_custom_margin():
+    # 4:3 image into 16:9 frame with 10% margin (80% fill)
+    # available = 1536x864, scale = min(1536/4000, 864/3000) = 0.288
+    w, h = compute_scaled_dimensions(4000, 3000, 1920, 1080, margin=10.0)
+    assert w == 1152
+    assert h == 863  # 3000 * 0.288 = 864, but float precision gives 863
+
+
+def test_scale_with_zero_margin():
+    # 4:3 image into 16:9 frame with 0% margin (100% fill)
+    # available = 1920x1080, scale = min(1920/4000, 1080/3000) = 0.36
+    w, h = compute_scaled_dimensions(4000, 3000, 1920, 1080, margin=0.0)
+    assert w == 1440
+    assert h == 1080
 
 
 def test_generate_image_clip_ffmpeg_command():
@@ -42,7 +69,10 @@ def test_generate_image_clip_ffmpeg_command():
     assert cmd[0] == "ffmpeg"
     assert "-loop" in cmd
     assert "photo.jpg" in cmd
-    assert "1920x1080" in cmd[cmd.index("-vf") + 1]
+    filter_str = cmd[cmd.index("-vf") + 1]
+    assert "1920x1080" in filter_str
+    assert "(main_w-overlay_w)/2" in filter_str
+    assert "(main_h-overlay_h)/2" in filter_str
 
 
 def test_generate_image_clip_returns_false_on_nonzero_returncode():

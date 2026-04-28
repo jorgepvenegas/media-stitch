@@ -10,11 +10,20 @@ from photowalk.ffmpeg_config import FfmpegEncodeConfig, build_scale_pad_filter, 
 
 
 def compute_scaled_dimensions(
-    img_width: int, img_height: int, frame_width: int, frame_height: int
+    img_width: int, img_height: int, frame_width: int, frame_height: int, margin: float = 15.0
 ) -> Tuple[int, int]:
-    """Scale image to fit within frame while preserving aspect ratio."""
-    scale_w = frame_width / img_width
-    scale_h = frame_height / img_height
+    """Scale image to fit within the frame with the given margin percentage.
+
+    Args:
+        margin: White space percentage on each side (default 15%).
+                The photo fills (100 - 2*margin)% of the frame.
+    """
+    fill_percent = 1.0 - (2 * margin / 100.0)
+    available_width = frame_width * fill_percent
+    available_height = frame_height * fill_percent
+
+    scale_w = available_width / img_width
+    scale_h = available_height / img_height
     scale = min(scale_w, scale_h)
     return int(img_width * scale), int(img_height * scale)
 
@@ -26,24 +35,29 @@ def generate_image_clip(
     frame_height: int,
     duration: float = 3.5,
     encode_config: FfmpegEncodeConfig | None = None,
+    margin: float = 15.0,
 ) -> bool:
-    """Generate a video clip with white background and centered image."""
+    """Generate a video clip with white background and centered image.
+
+    Args:
+        margin: White space percentage on each side (default 15%).
+    """
     try:
         with Image.open(image_path) as img:
             img_width, img_height = img.size
     except Exception:
         return False
 
-    scaled_w, scaled_h = compute_scaled_dimensions(img_width, img_height, frame_width, frame_height)
-    x_offset = (frame_width - scaled_w) // 2
-    y_offset = (frame_height - scaled_h) // 2
+    scaled_w, scaled_h = compute_scaled_dimensions(img_width, img_height, frame_width, frame_height, margin)
 
     if encode_config is None:
         encode_config = FfmpegEncodeConfig()
 
+    # Scale the image first, then overlay centered using ffmpeg expressions
     filter_str = (
         f"color=c=white:s={frame_width}x{frame_height}:d={duration}[bg];"
-        f"[bg][0:v]overlay={x_offset}:{y_offset}:enable='between(t,0,{duration})'"
+        f"[0:v]scale={scaled_w}:{scaled_h}[img];"
+        f"[bg][img]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,0,{duration})'"
     )
 
     cmd = [

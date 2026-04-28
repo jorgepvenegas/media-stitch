@@ -256,7 +256,8 @@ def fix_trim(original, trimmed, output, dry_run):
 @click.option("--recursive", "-r", is_flag=True, help="Scan directories recursively")
 @click.option("--draft", is_flag=True, help="Render a low-quality draft for faster preview")
 @click.option("--plan", type=click.Path(path_type=Path), help="Write stitch plan as JSON and exit")
-def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft, plan):
+@click.option("--margin", default=15.0, type=float, help="White space margin percentage on each side (default: 15)")
+def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft, plan, margin):
     """Stitch photos and videos into a single chronological video."""
     files = collect_files([path], recursive)
 
@@ -295,7 +296,7 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
                 pass
 
     if plan:
-        plan_data = generate_plan(timeline, output, frame_width, frame_height, image_duration, draft)
+        plan_data = generate_plan(timeline, output, frame_width, frame_height, image_duration, draft, margin)
         plan.write_text(json.dumps(plan_data, indent=2))
         click.echo(f"Plan written to {plan}")
         return
@@ -312,7 +313,7 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
     click.echo(f"Resolution: {frame_width}x{frame_height}")
     click.echo("Generating clips and stitching...")
 
-    ok = stitch(timeline, output, frame_width, frame_height, image_duration, keep_temp, draft=draft)
+    ok = stitch(timeline, output, frame_width, frame_height, image_duration, keep_temp, draft=draft, margin=margin)
     if ok:
         click.echo(click.style("Done!", fg="green"))
     else:
