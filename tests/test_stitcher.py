@@ -211,3 +211,15 @@ def test_compute_draft_resolution_preserves_aspect_ratio():
     w, h = _compute_draft_resolution(1920, 1080)
     assert w == 1280
     assert h == 720
+
+
+def test_run_concat_uses_custom_preset_and_crf():
+    from photowalk.stitcher import run_concat
+    with patch("photowalk.stitcher.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        run_concat(Path("list.txt"), Path("out.mp4"), preset="ultrafast", crf=28)
+    cmd = mock_run.call_args[0][0]
+    preset_idx = cmd.index("-preset")
+    assert cmd[preset_idx + 1] == "ultrafast"
+    crf_idx = cmd.index("-crf")
+    assert cmd[crf_idx + 1] == "28"

@@ -39,7 +39,7 @@ def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
     return output_path
 
 
-def run_concat(concat_list_path: Path, output_path: Path) -> bool:
+def run_concat(concat_list_path: Path, output_path: Path, preset: str = "fast", crf: int = 23) -> bool:
     """Run ffmpeg concat demuxer."""
     cmd = [
         "ffmpeg",
@@ -48,6 +48,8 @@ def run_concat(concat_list_path: Path, output_path: Path) -> bool:
         "-safe", "0",
         "-i", str(concat_list_path),
         "-c:v", "libx264",
+        "-preset", preset,
+        "-crf", str(crf),
         "-c:a", "aac",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
