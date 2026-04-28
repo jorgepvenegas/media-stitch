@@ -162,3 +162,9 @@ def test_stitch_video_segment():
     assert result is True
     # subprocess.run called at least twice: once for split, once for concat
     assert mock_run.call_count >= 2
+
+    # Verify the split command re-encodes (not -c copy) with scale filter
+    split_cmd = mock_run.call_args_list[0][0][0]
+    assert "libx264" in split_cmd
+    assert "scale=" in split_cmd[split_cmd.index("-vf") + 1]
+    assert "pad=" in split_cmd[split_cmd.index("-vf") + 1]

@@ -52,8 +52,14 @@ def _split_video_segment(
     trim_start: float,
     trim_end: float,
     output_path: Path,
+    frame_width: int,
+    frame_height: int,
 ) -> bool:
-    """Extract a segment from a video using ffmpeg trim."""
+    """Extract a segment from a video using ffmpeg trim.
+
+    Re-encodes instead of -c copy to ensure frame-accurate cuts at
+    non-keyframe boundaries.
+    """
     duration = trim_end - trim_start
     cmd = [
         "ffmpeg",
@@ -61,8 +67,15 @@ def _split_video_segment(
         "-ss", str(trim_start),
         "-i", str(video_path),
         "-t", str(duration),
-        "-c", "copy",
-        "-avoid_negative_ts", "make_zero",
+        "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "48000",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
         str(output_path),
     ]
     try:
@@ -105,6 +118,8 @@ def stitch(
                     entry.trim_start or 0.0,
                     entry.trim_end or 0.0,
                     seg_path,
+                    frame_width,
+                    frame_height,
                 )
                 if not ok:
                     return False
