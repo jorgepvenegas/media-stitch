@@ -49,6 +49,8 @@ def test_stitch_draft_flag():
     mock_stitch.assert_called_once()
     _, kwargs = mock_stitch.call_args
     assert kwargs["draft"] is True
+    # The echo must reflect the reduced draft resolution, not the original 1920x1080
+    assert "1280x720" in result.output
 
 
 def test_stitch_dry_run():
