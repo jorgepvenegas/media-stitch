@@ -111,9 +111,17 @@ def stitch(
     frame_height: int,
     image_duration: float = 3.5,
     keep_temp: bool = False,
+    draft: bool = False,
 ) -> bool:
     """Stitch all segments into a single output video."""
     temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
+    if draft:
+        frame_width, frame_height = _compute_draft_resolution(frame_width, frame_height)
+        preset = "ultrafast"
+        crf = 28
+    else:
+        preset = "fast"
+        crf = 23
     try:
         # Generate image clips and split video segments
         for entry in timeline_map.all_entries:
@@ -125,6 +133,8 @@ def stitch(
                     frame_width,
                     frame_height,
                     image_duration,
+                    preset=preset,
+                    crf=crf,
                 )
                 if not ok:
                     return False
@@ -139,6 +149,8 @@ def stitch(
                     seg_path,
                     frame_width,
                     frame_height,
+                    preset=preset,
+                    crf=crf,
                 )
                 if not ok:
                     return False
@@ -146,7 +158,7 @@ def stitch(
 
         concat_list_path = temp_dir / "concat_list.txt"
         build_concat_list(timeline_map.all_entries, concat_list_path)
-        ok = run_concat(concat_list_path, output_path)
+        ok = run_concat(concat_list_path, output_path, preset=preset, crf=crf)
         return ok
     finally:
         if keep_temp:

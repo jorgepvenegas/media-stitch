@@ -223,3 +223,32 @@ def test_run_concat_uses_custom_preset_and_crf():
     assert cmd[preset_idx + 1] == "ultrafast"
     crf_idx = cmd.index("-crf")
     assert cmd[crf_idx + 1] == "28"
+
+
+def test_stitch_draft_mode_uses_draft_params():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=3.5,
+        kind="image",
+        source_path=Path("photo.jpg"),
+    )
+    timeline = TimelineMap(
+        standalone_images=[entry],
+        all_entries=[entry],
+    )
+
+    with patch("photowalk.stitcher.generate_image_clip", return_value=True) as mock_clip:
+        with patch("photowalk.stitcher.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            result = stitch(timeline, Path("out.mp4"), 1920, 1080, draft=True, keep_temp=True)
+
+    assert result is True
+    mock_clip.assert_called_once()
+    _, kwargs = mock_clip.call_args
+    assert kwargs["preset"] == "ultrafast"
+    assert kwargs["crf"] == 28
+
+    # Check resolution passed to generate_image_clip is reduced
+    args = mock_clip.call_args[0]
+    assert args[2] == 1280  # frame_width
+    assert args[3] == 720   # frame_height
