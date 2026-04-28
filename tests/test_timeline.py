@@ -7,7 +7,14 @@ from unittest.mock import patch
 import pytest
 
 from photowalk.models import PhotoMetadata, VideoMetadata
-from photowalk.timeline import TimelineEntry, TimelineMap, VideoTimeline, build_timeline
+from photowalk.timeline import (
+    MediaInput,
+    TimelineEntry,
+    TimelineMap,
+    VideoTimeline,
+    build_timeline,
+    build_timeline_from_files,
+)
 
 
 def _dt(seconds_offset: float) -> datetime:
@@ -18,38 +25,29 @@ def _dt(seconds_offset: float) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# test_build_timeline_inline_image
+# build_timeline (pure algorithm)
 # ---------------------------------------------------------------------------
+
 
 def test_build_timeline_inline_image():
     """Video 120s, photo at t+30s → 3 segments: video_segment, image, video_segment."""
     video_path = Path("/tmp/video.mp4")
     photo_path = Path("/tmp/photo.jpg")
 
-    video_start = _dt(0)
-    video_end = _dt(120)
-    photo_time = _dt(30)
+    pairs: list[MediaInput] = [
+        (video_path, VideoMetadata(
+            source_path=video_path,
+            start_timestamp=_dt(0),
+            end_timestamp=_dt(120),
+            duration_seconds=120.0,
+        )),
+        (photo_path, PhotoMetadata(
+            source_path=photo_path,
+            timestamp=_dt(30),
+        )),
+    ]
 
-    video_meta = VideoMetadata(
-        source_path=video_path,
-        start_timestamp=video_start,
-        end_timestamp=video_end,
-        duration_seconds=120.0,
-    )
-    photo_meta = PhotoMetadata(
-        source_path=photo_path,
-        timestamp=photo_time,
-    )
-
-    def _mock_extract(path):
-        if path == video_path:
-            return video_meta
-        if path == photo_path:
-            return photo_meta
-        return None
-
-    with patch("photowalk.timeline.extract_metadata", side_effect=_mock_extract):
-        result = build_timeline([video_path, photo_path])
+    result = build_timeline(pairs)
 
     assert isinstance(result, TimelineMap)
     assert len(result.standalone_images) == 0
@@ -68,7 +66,7 @@ def test_build_timeline_inline_image():
     seg1 = vt.segments[1]
     assert seg1.kind == "image"
     assert seg1.source_path == photo_path
-    assert seg1.start_time == photo_time.replace(tzinfo=None)
+    assert seg1.start_time == _dt(30).replace(tzinfo=None)
 
     seg2 = vt.segments[2]
     assert seg2.kind == "video_segment"
@@ -76,52 +74,36 @@ def test_build_timeline_inline_image():
     assert seg2.trim_end == 120.0
     assert seg2.original_video == video_path
 
-    # all_entries should contain all 3 segments sorted by start_time
     assert len(result.all_entries) == 3
     assert result.all_entries[0].kind == "video_segment"
     assert result.all_entries[1].kind == "image"
     assert result.all_entries[2].kind == "video_segment"
 
 
-# ---------------------------------------------------------------------------
-# test_build_timeline_standalone_image
-# ---------------------------------------------------------------------------
-
 def test_build_timeline_standalone_image():
     """Image before video → standalone_images, not in any VideoTimeline."""
     video_path = Path("/tmp/video.mp4")
     photo_path = Path("/tmp/early_photo.jpg")
 
-    video_start = _dt(100)
-    video_end = _dt(220)
-    photo_time = _dt(10)  # before video
+    pairs: list[MediaInput] = [
+        (video_path, VideoMetadata(
+            source_path=video_path,
+            start_timestamp=_dt(100),
+            end_timestamp=_dt(220),
+            duration_seconds=120.0,
+        )),
+        (photo_path, PhotoMetadata(
+            source_path=photo_path,
+            timestamp=_dt(10),
+        )),
+    ]
 
-    video_meta = VideoMetadata(
-        source_path=video_path,
-        start_timestamp=video_start,
-        end_timestamp=video_end,
-        duration_seconds=120.0,
-    )
-    photo_meta = PhotoMetadata(
-        source_path=photo_path,
-        timestamp=photo_time,
-    )
-
-    def _mock_extract(path):
-        if path == video_path:
-            return video_meta
-        if path == photo_path:
-            return photo_meta
-        return None
-
-    with patch("photowalk.timeline.extract_metadata", side_effect=_mock_extract):
-        result = build_timeline([video_path, photo_path])
+    result = build_timeline(pairs)
 
     assert len(result.standalone_images) == 1
     assert result.standalone_images[0].source_path == photo_path
     assert result.standalone_images[0].kind == "image"
 
-    # Video has no inline images → should have a single video_segment for the whole video
     assert len(result.video_timelines) == 1
     vt = result.video_timelines[0]
     assert len(vt.segments) == 1
@@ -130,39 +112,24 @@ def test_build_timeline_standalone_image():
     assert vt.segments[0].trim_end == 120.0
 
 
-# ---------------------------------------------------------------------------
-# test_build_timeline_multiple_inline_images
-# ---------------------------------------------------------------------------
-
 def test_build_timeline_multiple_inline_images():
     """Two inline images → 5 segments: seg, img, seg, img, seg."""
     video_path = Path("/tmp/video.mp4")
     photo1_path = Path("/tmp/photo1.jpg")
     photo2_path = Path("/tmp/photo2.jpg")
 
-    video_start = _dt(0)
-    video_end = _dt(120)
+    pairs: list[MediaInput] = [
+        (video_path, VideoMetadata(
+            source_path=video_path,
+            start_timestamp=_dt(0),
+            end_timestamp=_dt(120),
+            duration_seconds=120.0,
+        )),
+        (photo1_path, PhotoMetadata(source_path=photo1_path, timestamp=_dt(30))),
+        (photo2_path, PhotoMetadata(source_path=photo2_path, timestamp=_dt(80))),
+    ]
 
-    video_meta = VideoMetadata(
-        source_path=video_path,
-        start_timestamp=video_start,
-        end_timestamp=video_end,
-        duration_seconds=120.0,
-    )
-    photo1_meta = PhotoMetadata(source_path=photo1_path, timestamp=_dt(30))
-    photo2_meta = PhotoMetadata(source_path=photo2_path, timestamp=_dt(80))
-
-    def _mock_extract(path):
-        if path == video_path:
-            return video_meta
-        if path == photo1_path:
-            return photo1_meta
-        if path == photo2_path:
-            return photo2_meta
-        return None
-
-    with patch("photowalk.timeline.extract_metadata", side_effect=_mock_extract):
-        result = build_timeline([video_path, photo1_path, photo2_path])
+    result = build_timeline(pairs)
 
     assert len(result.standalone_images) == 0
     vt = result.video_timelines[0]
@@ -177,14 +144,12 @@ def test_build_timeline_multiple_inline_images():
     assert len(result.all_entries) == 5
 
 
-# ---------------------------------------------------------------------------
-# test_build_timeline_empty
-# ---------------------------------------------------------------------------
-
 def test_build_timeline_empty():
-    """No usable files → empty TimelineMap."""
-    with patch("photowalk.timeline.extract_metadata", return_value=None):
-        result = build_timeline([Path("/tmp/unknown.xyz")])
+    """No usable entries → empty TimelineMap."""
+    pairs: list[MediaInput] = [
+        (Path("/tmp/photo.jpg"), PhotoMetadata(source_path=Path("/tmp/photo.jpg"))),
+    ]
+    result = build_timeline(pairs)
 
     assert isinstance(result, TimelineMap)
     assert len(result.video_timelines) == 0
@@ -208,22 +173,42 @@ def test_build_timeline_mixed_timezone_awareness():
     video_path = Path("/tmp/video.mp4")
     photo_path = Path("/tmp/photo.jpg")
 
-    # aware timestamp (like ffprobe produces)
-    video_start = datetime(2024, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
-    video_end = datetime(2024, 7, 15, 12, 2, 0, tzinfo=timezone.utc)
-    # naive timestamp (like EXIF produces)
-    photo_time = datetime(2024, 7, 15, 12, 0, 30)
+    pairs: list[MediaInput] = [
+        (video_path, VideoMetadata(
+            source_path=video_path,
+            start_timestamp=datetime(2024, 7, 15, 12, 0, 0, tzinfo=timezone.utc),
+            end_timestamp=datetime(2024, 7, 15, 12, 2, 0, tzinfo=timezone.utc),
+            duration_seconds=120.0,
+        )),
+        (photo_path, PhotoMetadata(
+            source_path=photo_path,
+            timestamp=datetime(2024, 7, 15, 12, 0, 30),  # naive
+        )),
+    ]
+
+    result = build_timeline(pairs)
+
+    assert len(result.video_timelines) == 1
+    assert len(result.video_timelines[0].segments) == 3
+
+
+# ---------------------------------------------------------------------------
+# build_timeline_from_files (I/O wrapper)
+# ---------------------------------------------------------------------------
+
+
+def test_build_timeline_from_files_extracts_and_builds():
+    """Wrapper extracts metadata and delegates to pure algorithm."""
+    video_path = Path("/tmp/video.mp4")
+    photo_path = Path("/tmp/photo.jpg")
 
     video_meta = VideoMetadata(
         source_path=video_path,
-        start_timestamp=video_start,
-        end_timestamp=video_end,
+        start_timestamp=_dt(0),
+        end_timestamp=_dt(120),
         duration_seconds=120.0,
     )
-    photo_meta = PhotoMetadata(
-        source_path=photo_path,
-        timestamp=photo_time,
-    )
+    photo_meta = PhotoMetadata(source_path=photo_path, timestamp=_dt(30))
 
     def _mock_extract(path):
         if path == video_path:
@@ -232,10 +217,8 @@ def test_build_timeline_mixed_timezone_awareness():
             return photo_meta
         return None
 
-    # This used to raise:
-    #   TypeError: can't compare offset-naive and offset-aware datetimes
-    with patch("photowalk.timeline.extract_metadata", side_effect=_mock_extract):
-        result = build_timeline([video_path, photo_path])
+    with patch("photowalk.api.extract_metadata", side_effect=_mock_extract):
+        result = build_timeline_from_files([video_path, photo_path])
 
     assert len(result.video_timelines) == 1
     assert len(result.video_timelines[0].segments) == 3

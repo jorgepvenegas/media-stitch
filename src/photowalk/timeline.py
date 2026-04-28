@@ -1,7 +1,7 @@
 """Timeline builder for video stitcher.
 
-Scans a list of media files, extracts metadata, and builds a sorted timeline
-that associates inline images with the video whose time range contains them.
+Builds a sorted timeline that associates inline images with the video
+whose time range contains them.  Pure algorithm — no I/O.
 """
 
 from __future__ import annotations
@@ -9,10 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Tuple, Union
 
-from photowalk.api import extract_metadata
 from photowalk.models import PhotoMetadata, VideoMetadata
+
+# A pre-extracted metadata pair: (file_path, metadata).
+MediaInput = Tuple[Path, Union[PhotoMetadata, VideoMetadata]]
 
 
 @dataclass
@@ -116,25 +118,22 @@ def _make_video_segments(
 # Public API
 # ---------------------------------------------------------------------------
 
-def build_timeline(files: List[Path]) -> TimelineMap:
-    """Build a sorted timeline from a list of media file paths.
+def build_timeline(metadata_pairs: List[MediaInput]) -> TimelineMap:
+    """Build a sorted timeline from pre-extracted metadata.
 
+    Pure algorithm — no I/O.  Each pair is (file_path, metadata).
     For each video, images whose timestamp falls within [video_start, video_end]
     are treated as inline and the video is split around them.  Images outside
     all video ranges are standalone.
     """
-    if not files:
+    if not metadata_pairs:
         return TimelineMap()
 
-    # --- Extract metadata -----------------------------------------------
+    # --- Classify entries -----------------------------------------------
     photo_entries: List[TimelineEntry] = []
     video_timelines: List[VideoTimeline] = []
 
-    for path in files:
-        meta = extract_metadata(path)
-        if meta is None:
-            continue
-
+    for path, meta in metadata_pairs:
         if isinstance(meta, PhotoMetadata) and meta.timestamp is not None:
             photo_entries.append(
                 TimelineEntry(
@@ -195,3 +194,20 @@ def build_timeline(files: List[Path]) -> TimelineMap:
         standalone_images=standalone_images,
         all_entries=all_entries,
     )
+
+
+def build_timeline_from_files(files: List[Path]) -> TimelineMap:
+    """Extract metadata from files and build a timeline.
+
+    Convenience wrapper around build_timeline() that handles I/O.
+    Files that fail to extract or have no usable metadata are silently skipped.
+    """
+    from photowalk.api import extract_metadata
+
+    pairs: List[MediaInput] = []
+    for path in files:
+        meta = extract_metadata(path)
+        if meta is not None:
+            pairs.append((path, meta))
+
+    return build_timeline(pairs)

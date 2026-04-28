@@ -41,7 +41,7 @@ def test_stitch_draft_flag():
 
         mock_timeline = _make_mock_timeline()
 
-        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
             with patch("photowalk.cli.stitch") as mock_stitch:
                 mock_stitch.return_value = True
                 result = runner.invoke(main, [
@@ -64,7 +64,7 @@ def test_stitch_dry_run():
 
         mock_timeline = _make_mock_timeline()
 
-        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
             result = runner.invoke(main, ["stitch", ".", "--output", "out.mp4", "--dry-run"])
 
     assert result.exit_code == 0
@@ -86,7 +86,7 @@ def test_stitch_invalid_format():
 
         mock_timeline = _make_mock_timeline()
 
-        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
             result = runner.invoke(main, ["stitch", ".", "--output", "out.mp4", "--format", "bad"])
     assert result.exit_code == 1
     assert "1920x1080" in result.output or "WIDTHxHEIGHT" in result.output
@@ -100,7 +100,7 @@ def test_stitch_plan_writes_json():
 
         mock_timeline = _make_mock_timeline()
 
-        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
             result = runner.invoke(main, [
                 "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
             ])
@@ -124,7 +124,7 @@ def test_stitch_plan_no_video_generation():
 
         mock_timeline = _make_mock_timeline()
 
-        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
             with patch("photowalk.cli.stitch") as mock_stitch:
                 result = runner.invoke(main, [
                     "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
