@@ -44,7 +44,7 @@ def write_photo_timestamp(path: Path, new_timestamp: datetime) -> bool:
 
 def write_video_timestamp(path: Path, new_timestamp: datetime) -> bool:
     """Write creation_time metadata via ffmpeg -c copy. Returns True on success."""
-    temp_path = path.with_suffix(path.suffix + ".tmp")
+    temp_path = path.parent / (path.stem + ".tmp" + path.suffix)
     cmd = [
         "ffmpeg",
         "-y",

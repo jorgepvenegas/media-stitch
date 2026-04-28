@@ -57,8 +57,8 @@ class TestWriteVideoTimestamp:
         assert "copy" in call_args
         assert "-metadata" in call_args
         assert "creation_time=2024-07-15T14:32:10+00:00" in call_args
-        assert "/tmp/video.mp4.tmp" in call_args
-        mock_replace.assert_called_once_with(Path("/tmp/video.mp4.tmp"), Path("/tmp/video.mp4"))
+        assert "/tmp/video.tmp.mp4" in call_args
+        mock_replace.assert_called_once_with(Path("/tmp/video.tmp.mp4"), Path("/tmp/video.mp4"))
 
     def test_ffmpeg_failure_returns_false(self):
         mock_result = MagicMock()
@@ -71,7 +71,7 @@ class TestWriteVideoTimestamp:
                     result = write_video_timestamp(Path("/tmp/video.mp4"), datetime(2024, 7, 15, 14, 32, 10))
 
         assert result is False
-        mock_remove.assert_called_once_with(Path("/tmp/video.mp4.tmp"))
+        mock_remove.assert_called_once_with(Path("/tmp/video.tmp.mp4"))
 
     def test_ffmpeg_not_found_returns_false(self):
         with patch("photowalk.writers.subprocess.run", side_effect=FileNotFoundError()):
