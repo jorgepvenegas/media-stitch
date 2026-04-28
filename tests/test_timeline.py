@@ -1,6 +1,6 @@
 """Tests for the timeline builder."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,7 +14,7 @@ def _dt(seconds_offset: float) -> datetime:
     """Create a UTC datetime offset from a fixed epoch for test convenience."""
     return datetime(2024, 7, 15, 14, 0, 0, tzinfo=timezone.utc).replace(
         second=0
-    ) + __import__("datetime").timedelta(seconds=seconds_offset)
+    ) + timedelta(seconds=seconds_offset)
 
 
 # ---------------------------------------------------------------------------

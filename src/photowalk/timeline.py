@@ -7,7 +7,7 @@ that associates inline images with the video whose time range contains them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -67,9 +67,7 @@ def _make_video_segments(
 
         # Video segment before the image (skip zero-length segments)
         if image_offset > current_offset:
-            seg_start = video_start + __import__("datetime").timedelta(
-                seconds=current_offset
-            )
+            seg_start = video_start + timedelta(seconds=current_offset)
             segments.append(
                 TimelineEntry(
                     start_time=seg_start,
@@ -87,9 +85,7 @@ def _make_video_segments(
 
     # Final video segment after the last image (or the whole video if no images)
     if current_offset < duration_seconds:
-        seg_start = video_start + __import__("datetime").timedelta(
-            seconds=current_offset
-        )
+        seg_start = video_start + timedelta(seconds=current_offset)
         segments.append(
             TimelineEntry(
                 start_time=seg_start,
@@ -116,8 +112,6 @@ def build_timeline(files: List[Path]) -> TimelineMap:
     are treated as inline and the video is split around them.  Images outside
     all video ranges are standalone.
     """
-    from datetime import timedelta  # local import to avoid circular concerns
-
     if not files:
         return TimelineMap()
 
