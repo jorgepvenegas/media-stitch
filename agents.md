@@ -74,7 +74,7 @@ tests/
 - **Detect trim offset:** Use `detect_trim_offset(original, trimmed)` from `offset_detector.py`
 - **Build timeline:** Use `build_timeline(files)` from `timeline.py`
 - **Generate image clips:** Use `generate_image_clip(path, output, width, height, duration)` from `image_clip.py`
-- **Stitch videos:** Use `stitch(timeline_map, output, width, height, ...)` from `stitcher.py`
+- **Stitch videos:** Use `stitch(timeline_map, output, width, height, draft=False, ...)` from `stitcher.py`
 
 ### Error handling
 
@@ -113,6 +113,7 @@ uv run photowalk batch ~/Photos/ --recursive
 uv run photowalk sync ~/Photos/ --offset "-2h" --dry-run
 uv run photowalk fix-trim original.mp4 trimmed.mp4 --dry-run
 uv run photowalk stitch ~/Photos/ --output final.mp4 --dry-run
+uv run photowalk stitch ~/Photos/ --output final.mp4 --draft
 ```
 
 ## Design Decisions

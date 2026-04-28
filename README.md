@@ -99,6 +99,9 @@ photowalk stitch ~/Photos/2024/ --output final.mp4 --format 1920x1080
 # Change image display duration (default is 3.5 seconds)
 photowalk stitch ~/Photos/2024/ --output final.mp4 --image-duration 5.0
 
+# Render a low-quality draft for faster preview
+photowalk stitch ~/Photos/2024/ --output final.mp4 --draft
+
 # Keep temporary clips for debugging
 photowalk stitch ~/Photos/2024/ --output final.mp4 --keep-temp
 ```
