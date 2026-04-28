@@ -104,6 +104,131 @@ def _split_video_segment(
     return result.returncode == 0
 
 
+def generate_plan(
+    timeline_map: TimelineMap,
+    output_path: Path,
+    frame_width: int,
+    frame_height: int,
+    image_duration: float = 3.5,
+    draft: bool = False,
+) -> dict:
+    """Generate a plan dict describing how stitch() would process the timeline."""
+    if draft:
+        frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
+        preset = "ultrafast"
+        crf = 28
+    else:
+        preset = "fast"
+        crf = 23
+
+    temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
+    timeline_entries = []
+    ffmpeg_commands = []
+
+    for entry in timeline_map.all_entries:
+        if entry.kind == "image":
+            clip_path = temp_dir / f"img_{entry.source_path.stem}.mp4"
+            cmd = [
+                "ffmpeg", "-y",
+                "-loop", "1",
+                "-i", str(entry.source_path.resolve()),
+                "-t", str(image_duration),
+                "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+                "-c:v", "libx264",
+                "-preset", preset,
+                "-crf", str(crf),
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(clip_path),
+            ]
+            ffmpeg_commands.append({
+                "step": "image_clip",
+                "source": str(entry.source_path),
+                "output": str(clip_path),
+                "command": cmd,
+            })
+            timeline_entries.append({
+                "start_time": entry.start_time.isoformat(),
+                "duration": image_duration,
+                "kind": "image",
+                "source": str(entry.source_path),
+                "original_video": None,
+                "trim_start": None,
+                "trim_end": None,
+            })
+
+        elif entry.kind == "video_segment":
+            seg_path = temp_dir / f"seg_{entry.trim_start:.3f}_{entry.source_path.stem}.mp4"
+            duration = (entry.trim_end or 0) - (entry.trim_start or 0)
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", str(entry.trim_start or 0.0),
+                "-i", str(entry.source_path.resolve()),
+                "-t", str(duration),
+                "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+                "-c:v", "libx264",
+                "-preset", preset,
+                "-crf", str(crf),
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-ar", "48000",
+                "-r", "30",
+                "-video_track_timescale", "15360",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(seg_path),
+            ]
+            ffmpeg_commands.append({
+                "step": "video_segment",
+                "source": str(entry.source_path),
+                "output": str(seg_path),
+                "command": cmd,
+            })
+            timeline_entries.append({
+                "start_time": entry.start_time.isoformat(),
+                "duration": entry.duration_seconds,
+                "kind": "video_segment",
+                "source": str(entry.source_path),
+                "original_video": str(entry.original_video) if entry.original_video else None,
+                "trim_start": entry.trim_start,
+                "trim_end": entry.trim_end,
+            })
+
+    # Build concat command
+    concat_list_path = temp_dir / "concat_list.txt"
+    concat_cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(concat_list_path),
+        "-c:v", "libx264",
+        "-preset", preset,
+        "-crf", str(crf),
+        "-c:a", "aac",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        str(output_path),
+    ]
+    ffmpeg_commands.append({
+        "step": "concat",
+        "input": str(concat_list_path),
+        "output": str(output_path),
+        "command": concat_cmd,
+    })
+
+    return {
+        "settings": {
+            "output": str(output_path),
+            "resolution": [frame_width, frame_height],
+            "image_duration": image_duration,
+            "draft": draft,
+        },
+        "timeline": timeline_entries,
+        "temp_dir": str(temp_dir),
+        "ffmpeg_commands": ffmpeg_commands,
+    }
+
+
 def stitch(
     timeline_map: TimelineMap,
     output_path: Path,

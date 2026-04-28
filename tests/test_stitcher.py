@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import tempfile
 
-from photowalk.stitcher import build_concat_list, run_concat, stitch
+from photowalk.stitcher import build_concat_list, run_concat, stitch, generate_plan
 from photowalk.timeline import TimelineEntry, TimelineMap, VideoTimeline
 
 
@@ -226,6 +226,75 @@ def test_run_concat_uses_custom_preset_and_crf():
     assert cmd[preset_idx + 1] == "ultrafast"
     crf_idx = cmd.index("-crf")
     assert cmd[crf_idx + 1] == "28"
+
+
+def test_generate_plan_image_entry():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=3.5,
+        kind="image",
+        source_path=Path("/photos/pic.jpg"),
+    )
+    timeline = TimelineMap(all_entries=[entry])
+
+    plan = generate_plan(timeline, Path("out.mp4"), 1920, 1080, image_duration=3.5)
+
+    assert plan["settings"]["output"] == "out.mp4"
+    assert plan["settings"]["resolution"] == [1920, 1080]
+    assert plan["settings"]["image_duration"] == 3.5
+    assert plan["settings"]["draft"] is False
+    assert len(plan["timeline"]) == 1
+    assert plan["timeline"][0]["kind"] == "image"
+    assert plan["timeline"][0]["source"] == "/photos/pic.jpg"
+    assert plan["timeline"][0]["duration"] == 3.5
+    assert len(plan["ffmpeg_commands"]) == 2  # image_clip + concat
+    assert plan["ffmpeg_commands"][0]["step"] == "image_clip"
+    assert plan["ffmpeg_commands"][1]["step"] == "concat"
+
+
+def test_generate_plan_video_segment():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=10.0,
+        kind="video_segment",
+        source_path=Path("/videos/clip.mp4"),
+        original_video=Path("/videos/clip.mp4"),
+        trim_start=5.0,
+        trim_end=15.0,
+    )
+    timeline = TimelineMap(all_entries=[entry])
+
+    plan = generate_plan(timeline, Path("out.mp4"), 1920, 1080)
+
+    assert len(plan["timeline"]) == 1
+    t = plan["timeline"][0]
+    assert t["kind"] == "video_segment"
+    assert t["source"] == "/videos/clip.mp4"
+    assert t["original_video"] == "/videos/clip.mp4"
+    assert t["trim_start"] == 5.0
+    assert t["trim_end"] == 15.0
+    assert len(plan["ffmpeg_commands"]) == 2  # split + concat
+    assert plan["ffmpeg_commands"][0]["step"] == "video_segment"
+    assert "-ss" in plan["ffmpeg_commands"][0]["command"]
+    assert "5.0" in plan["ffmpeg_commands"][0]["command"]
+
+
+def test_generate_plan_draft_mode():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=3.5,
+        kind="image",
+        source_path=Path("/photos/pic.jpg"),
+    )
+    timeline = TimelineMap(all_entries=[entry])
+
+    plan = generate_plan(timeline, Path("out.mp4"), 1920, 1080, draft=True)
+
+    assert plan["settings"]["draft"] is True
+    assert plan["settings"]["resolution"] == [1280, 720]
+    cmd = plan["ffmpeg_commands"][0]["command"]
+    assert "ultrafast" in cmd
+    assert "28" in cmd
 
 
 def test_stitch_draft_mode_uses_draft_params():
