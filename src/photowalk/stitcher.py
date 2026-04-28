@@ -9,7 +9,7 @@ from photowalk.image_clip import generate_image_clip
 from photowalk.timeline import TimelineEntry, TimelineMap
 
 
-def _compute_draft_resolution(width: int, height: int) -> tuple[int, int]:
+def compute_draft_resolution(width: int, height: int) -> tuple[int, int]:
     """Scale resolution proportionally so it fits within 1280x720.
 
     Output dimensions are rounded down to the nearest even number so they
@@ -116,7 +116,7 @@ def stitch(
     """Stitch all segments into a single output video."""
     temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
     if draft:
-        frame_width, frame_height = _compute_draft_resolution(frame_width, frame_height)
+        frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
         preset = "ultrafast"
         crf = 28
     else:

@@ -180,7 +180,7 @@ def test_stitch_video_segment():
 
 
 def test_split_video_segment_uses_custom_preset_and_crf():
-    from photowalk.stitcher import _split_video_segment
+    from photowalk.stitcher import _split_video_segment  # internal helper, tested directly
     with patch("photowalk.stitcher.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         _split_video_segment(
@@ -197,20 +197,23 @@ def test_split_video_segment_uses_custom_preset_and_crf():
 
 
 def test_compute_draft_resolution_scales_down():
-    from photowalk.stitcher import _compute_draft_resolution
-    assert _compute_draft_resolution(1920, 1080) == (1280, 720)
+    from photowalk.stitcher import compute_draft_resolution
+    assert compute_draft_resolution(1920, 1080) == (1280, 720)
 
 
 def test_compute_draft_resolution_preserves_small():
-    from photowalk.stitcher import _compute_draft_resolution
-    assert _compute_draft_resolution(640, 480) == (640, 480)
+    from photowalk.stitcher import compute_draft_resolution
+    assert compute_draft_resolution(640, 480) == (640, 480)
 
 
 def test_compute_draft_resolution_preserves_aspect_ratio():
-    from photowalk.stitcher import _compute_draft_resolution
-    w, h = _compute_draft_resolution(1920, 1080)
-    assert w == 1280
+    # 2560x1600 is 16:10; height is the limiting axis (1600 * scale > 1280 * scale)
+    from photowalk.stitcher import compute_draft_resolution
+    w, h = compute_draft_resolution(2560, 1600)
     assert h == 720
+    assert w == 1152  # 2560 * (720/1600) = 1152 (even)
+    # Aspect ratio preserved to within 1 pixel of rounding
+    assert abs(w / h - 2560 / 1600) < 0.01
 
 
 def test_run_concat_uses_custom_preset_and_crf():

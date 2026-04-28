@@ -9,7 +9,7 @@ import click
 from click.exceptions import Exit
 
 from photowalk.api import extract_metadata
-from photowalk.stitcher import stitch, _compute_draft_resolution
+from photowalk.stitcher import stitch, compute_draft_resolution
 from photowalk.timeline import build_timeline
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
 from photowalk.extractors import ffprobe_not_found_error, run_ffprobe
@@ -389,7 +389,7 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
         return
 
     if draft:
-        frame_width, frame_height = _compute_draft_resolution(frame_width, frame_height)
+        frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
 
     click.echo(f"\nOutput: {output}")
     click.echo(f"Resolution: {frame_width}x{frame_height}")
