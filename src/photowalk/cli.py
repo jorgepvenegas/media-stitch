@@ -9,90 +9,21 @@ import click
 from click.exceptions import Exit
 
 from photowalk.api import extract_metadata
-from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
-from photowalk.timeline import build_timeline
+from photowalk.collector import collect_files
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
 from photowalk.extractors import run_ffprobe
+from photowalk.formatters import (
+    format_csv,
+    format_sync_preview,
+    format_table,
+    format_timeline,
+)
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.offset import compute_offset, OffsetError
 from photowalk.offset_detector import detect_trim_offset, OffsetDetectionError
+from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
+from photowalk.timeline import build_timeline
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
-
-
-def _collect_files(
-    paths: list[Path],
-    recursive: bool,
-    include_photos: bool = True,
-    include_videos: bool = True,
-) -> list[Path]:
-    """Collect media files from a list of paths, with optional type filtering."""
-    files = []
-    for path in paths:
-        if path.is_file():
-            if path.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS:
-                files.append(path)
-        elif path.is_dir():
-            pattern = "**/*" if recursive else "*"
-            for child in path.glob(pattern):
-                if child.is_file() and child.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS:
-                    files.append(child)
-
-    if not include_photos:
-        files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
-    if not include_videos:
-        files = [f for f in files if f.suffix.lower() not in VIDEO_EXTENSIONS]
-
-    return files
-
-
-def _format_table(results: list[PhotoMetadata | VideoMetadata]) -> str:
-    lines = []
-    lines.append(f"{'File':<40} {'Type':<8} {'Timestamp':<25} {'Details'}")
-    lines.append("-" * 100)
-    for r in results:
-        name = str(r.source_path)[:39]
-        if isinstance(r, PhotoMetadata):
-            ts = r.timestamp.isoformat() if r.timestamp else "N/A"
-            details = f"{r.camera_model or 'N/A'} | ISO {r.iso or 'N/A'} | {r.focal_length or 'N/A'}"
-            lines.append(f"{name:<40} {'photo':<8} {ts:<25} {details}")
-        else:
-            start = r.start_timestamp.isoformat() if r.start_timestamp else "N/A"
-            end = r.end_timestamp.isoformat() if r.end_timestamp else "N/A"
-            dur = f"{r.duration_seconds:.1f}s" if r.duration_seconds else "N/A"
-            lines.append(f"{name:<40} {'video':<8} {start:<25} end={end} dur={dur}")
-    return "\n".join(lines)
-
-
-def _format_csv(results: list[PhotoMetadata | VideoMetadata]) -> str:
-    lines = ["source_path,media_type,timestamp,camera_model,shutter_speed,iso,focal_length,start_timestamp,end_timestamp,duration_seconds"]
-    for r in results:
-        d = r.to_dict()
-        lines.append(
-            f'"{d["source_path"]}",{d["media_type"]},'
-            f'"{d.get("timestamp") or ""}","{d.get("camera_model") or ""}",'
-            f'"{d.get("shutter_speed") or ""}",{d.get("iso") or ""},'
-            f'"{d.get("focal_length") or ""}","{d.get("start_timestamp") or ""}",'
-            f'"{d.get("end_timestamp") or ""}",{d.get("duration_seconds") or ""}'
-        )
-    return "\n".join(lines)
-
-
-def _format_timedelta(td: timedelta) -> str:
-    """Format a timedelta as a human-readable string like '-8h 23m 5s'."""
-    total_seconds = int(td.total_seconds())
-    sign = "-" if total_seconds < 0 else "+"
-    total_seconds = abs(total_seconds)
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    seconds = total_seconds % 60
-    parts = []
-    if hours:
-        parts.append(f"{hours}h")
-    if minutes:
-        parts.append(f"{minutes}m")
-    if seconds:
-        parts.append(f"{seconds}s")
-    return sign + " ".join(parts) if parts else "0s"
 
 
 @click.group()
@@ -128,7 +59,7 @@ def info(path: Path):
 def batch(paths, output, recursive, include_photos, include_videos):
     """Process multiple files or directories."""
     try:
-        files = _collect_files(list(paths), recursive, include_photos, include_videos)
+        files = collect_files(list(paths), recursive, include_photos, include_videos)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
         raise Exit(1)
@@ -146,9 +77,9 @@ def batch(paths, output, recursive, include_photos, include_videos):
     if output == "json":
         click.echo(json.dumps([r.to_dict() for r in results], indent=2))
     elif output == "csv":
-        click.echo(_format_csv(results))
+        click.echo(format_csv(results))
     else:
-        click.echo(_format_table(results))
+        click.echo(format_table(results))
 
 
 @main.command()
@@ -169,7 +100,7 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
         raise Exit(1)
 
     try:
-        files = _collect_files(list(paths), recursive, include_photos, include_videos)
+        files = collect_files(list(paths), recursive, include_photos, include_videos)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
         raise Exit(1)
@@ -209,19 +140,7 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
 
         preview.append((f, current, new_time, None))
 
-    # Show preview table
-    lines = []
-    lines.append(f"{'File':<40} {'Current Timestamp':<30} {'New Timestamp':<30} {'Delta'}")
-    lines.append("-" * 120)
-    for f, current, new_time, reason in preview:
-        name = str(f)[:39]
-        if reason:
-            lines.append(f"{name:<40} {'N/A':<30} {'N/A':<30} {reason}")
-        else:
-            cur_str = current.isoformat() if current else "N/A"
-            new_str = new_time.isoformat() if new_time else "N/A"
-            lines.append(f"{name:<40} {cur_str:<30} {new_str:<30} {_format_timedelta(delta)}")
-    click.echo("\n".join(lines))
+    click.echo(format_sync_preview(preview, delta))
 
     if dry_run:
         return
@@ -339,8 +258,7 @@ def fix_trim(original, trimmed, output, dry_run):
 @click.option("--plan", type=click.Path(path_type=Path), help="Write stitch plan as JSON and exit")
 def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft, plan):
     """Stitch photos and videos into a single chronological video."""
-    files = _collect_files([path], recursive)
-    files = [f for f in files if f.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS]
+    files = collect_files([path], recursive)
 
     if not files:
         click.echo("No media files found.")
@@ -382,16 +300,7 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
         click.echo(f"Plan written to {plan}")
         return
 
-    # Show timeline preview
-    lines = [f"{'Start':<25} {'Duration':<10} {'Type':<15} {'Source'}"]
-    lines.append("-" * 90)
-    for entry in all_entries:
-        start = entry.start_time.isoformat() if entry.start_time else "N/A"
-        name = str(entry.source_path.name)[:40]
-        # Images show 0.0 in timeline builder; display their actual clip duration
-        dur = image_duration if entry.kind == "image" else entry.duration_seconds
-        lines.append(f"{start:<25} {dur:<10.1f} {entry.kind:<15} {name}")
-    click.echo("\n".join(lines))
+    click.echo(format_timeline(all_entries, image_duration))
 
     if dry_run:
         return
