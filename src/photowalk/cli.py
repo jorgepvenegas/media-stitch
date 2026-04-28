@@ -9,6 +9,8 @@ import click
 from click.exceptions import Exit
 
 from photowalk.api import extract_metadata
+from photowalk.stitcher import stitch
+from photowalk.timeline import build_timeline
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
 from photowalk.extractors import ffprobe_not_found_error, run_ffprobe
 from photowalk.models import PhotoMetadata, VideoMetadata
@@ -322,6 +324,77 @@ def fix_trim(original, trimmed, output, dry_run):
         raise Exit(1)
 
     click.echo(f"Updated {target_path}")
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--output", "-o", required=True, type=click.Path(path_type=Path))
+@click.option("--format", "fmt", help="Output resolution like 1920x1080")
+@click.option("--image-duration", default=3.5, type=float, help="Seconds to show each image")
+@click.option("--keep-temp", is_flag=True, help="Preserve temporary files")
+@click.option("--dry-run", is_flag=True, help="Preview timeline without generating output")
+@click.option("--recursive", "-r", is_flag=True, help="Scan directories recursively")
+def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive):
+    """Stitch photos and videos into a single chronological video."""
+    files = _collect_files([path], recursive)
+    files = [f for f in files if f.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS]
+
+    if not files:
+        click.echo("No media files found.")
+        return
+
+    timeline = build_timeline(files)
+    all_entries = timeline.all_entries
+
+    if not all_entries:
+        click.echo("No usable media found (all files missing timestamps).")
+        return
+
+    # Determine output resolution
+    frame_width, frame_height = 1920, 1080
+    if fmt:
+        try:
+            frame_width, frame_height = map(int, fmt.split("x"))
+        except ValueError:
+            click.echo(click.style("Error: --format must be WIDTHxHEIGHT (e.g. 1920x1080)", fg="red"), err=True)
+            raise Exit(1)
+    else:
+        # Use first video's resolution via ffprobe
+        for vt in timeline.video_timelines:
+            try:
+                data = run_ffprobe(vt.video_path)
+                if data and "streams" in data:
+                    for stream in data["streams"]:
+                        if stream.get("codec_type") == "video":
+                            frame_width = int(stream.get("width", 1920))
+                            frame_height = int(stream.get("height", 1080))
+                            break
+                    break
+            except Exception:
+                pass
+
+    # Show timeline preview
+    lines = [f"{'Start':<25} {'Duration':<10} {'Type':<15} {'Source'}"]
+    lines.append("-" * 90)
+    for entry in all_entries:
+        start = entry.start_time.isoformat() if entry.start_time else "N/A"
+        name = str(entry.source_path.name)[:40]
+        lines.append(f"{start:<25} {entry.duration_seconds:<10.1f} {entry.kind:<15} {name}")
+    click.echo("\n".join(lines))
+
+    if dry_run:
+        return
+
+    click.echo(f"\nOutput: {output}")
+    click.echo(f"Resolution: {frame_width}x{frame_height}")
+    click.echo("Generating clips and stitching...")
+
+    ok = stitch(timeline, output, frame_width, frame_height, image_duration, keep_temp)
+    if ok:
+        click.echo(click.style("Done!", fg="green"))
+    else:
+        click.echo(click.style("Error: Stitching failed.", fg="red"), err=True)
+        raise Exit(1)
 
 
 if __name__ == "__main__":
