@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import click
+from click.exceptions import Exit
 
 from photowalk.api import extract_metadata
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
@@ -96,7 +97,7 @@ def info(path: Path):
         result = extract_metadata(path)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
-        raise click.Exit(1)
+        raise Exit(1)
 
     if result is None:
         click.echo("Unsupported file type.")
@@ -117,7 +118,7 @@ def batch(paths, output, recursive, include_photos, include_videos):
         files = _collect_files(list(paths), recursive)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
-        raise click.Exit(1)
+        raise Exit(1)
 
     if not include_photos:
         files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
@@ -157,13 +158,13 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
         delta = compute_offset(offset, reference)
     except OffsetError as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
-        raise click.Exit(1)
+        raise Exit(1)
 
     try:
         files = _collect_files(list(paths), recursive)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
-        raise click.Exit(1)
+        raise Exit(1)
 
     if not include_photos:
         files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
@@ -278,7 +279,7 @@ def fix_trim(original, trimmed, output, dry_run):
                 click.style(f"Error: {label} must be a video file", fg="red"),
                 err=True,
             )
-            raise click.Exit(1)
+            raise Exit(1)
 
     original_meta = extract_metadata(original)
     if not isinstance(original_meta, VideoMetadata) or original_meta.start_timestamp is None:
@@ -286,13 +287,13 @@ def fix_trim(original, trimmed, output, dry_run):
             click.style("Error: Could not read start timestamp from original video", fg="red"),
             err=True,
         )
-        raise click.Exit(1)
+        raise Exit(1)
 
     try:
         offset_seconds = detect_trim_offset(original, trimmed)
     except OffsetDetectionError as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
-        raise click.Exit(1)
+        raise Exit(1)
 
     adjusted_start = original_meta.start_timestamp + timedelta(seconds=offset_seconds)
 
@@ -318,7 +319,7 @@ def fix_trim(original, trimmed, output, dry_run):
             click.style(f"Error: Failed to write timestamp to {target_path}", fg="red"),
             err=True,
         )
-        raise click.Exit(1)
+        raise Exit(1)
 
     click.echo(f"Updated {target_path}")
 

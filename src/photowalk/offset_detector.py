@@ -67,8 +67,8 @@ def _load_audio(path: Path) -> tuple[np.ndarray, int]:
 def find_audio_offset(original: np.ndarray, trimmed: np.ndarray, sample_rate: int) -> float:
     """Find the temporal offset (in seconds) of trimmed audio within original audio via cross-correlation.
 
-    Raises OffsetDetectionError if the correlation confidence is below 0.5 or if
-    trimmed is longer than original.
+    Raises OffsetDetectionError if the correlation peak is not significantly above
+    the mean correlation level, or if trimmed is longer than original.
     """
     if len(trimmed) > len(original):
         raise OffsetDetectionError("Trimmed audio is longer than original")
@@ -80,10 +80,12 @@ def find_audio_offset(original: np.ndarray, trimmed: np.ndarray, sample_rate: in
     peak_idx = int(np.argmax(correlation))
     peak_val = float(correlation[peak_idx])
 
-    confidence = peak_val / len(trimmed_norm)
-    if confidence < 0.5:
+    mean_corr = float(np.mean(correlation))
+    std_corr = float(np.std(correlation))
+    z_score = (peak_val - mean_corr) / (std_corr + 1e-10)
+    if z_score < 5.0:
         raise OffsetDetectionError(
-            f"Could not reliably detect trim point (confidence: {confidence:.2f}). "
+            f"Could not reliably detect trim point (z-score: {z_score:.1f}). "
             "Videos may be too different."
         )
 

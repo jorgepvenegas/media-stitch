@@ -93,7 +93,7 @@ class TestFindAudioOffset:
         original = rng.standard_normal(16000).astype(np.float32)
         trimmed = rng.standard_normal(8000).astype(np.float32)
 
-        with pytest.raises(OffsetDetectionError, match="confidence"):
+        with pytest.raises(OffsetDetectionError, match="reliably detect"):
             find_audio_offset(original, trimmed, 16000)
 
     def test_trimmed_longer_than_original_raises(self):

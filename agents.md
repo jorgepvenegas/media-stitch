@@ -6,7 +6,7 @@ A Python CLI tool and library for extracting and synchronizing timestamps and ca
 
 - **Photos:** EXIF extraction via Pillow, timestamp writing via piexif
 - **Videos:** Metadata extraction and writing via ffmpeg/ffprobe
-- **CLI:** Click-based with `info`, `batch`, and `sync` commands
+- **CLI:** Click-based with `info`, `batch`, `sync`, and `fix-trim` commands
 
 ## Tech Stack
 
@@ -30,11 +30,13 @@ src/photowalk/
 ├── extractors.py        # ffprobe subprocess wrapper
 ├── parsers.py           # Parse raw EXIF/ffprobe JSON into typed models
 ├── offset.py            # Parse --offset and --reference into timedelta
+├── offset_detector.py   # Audio cross-correlation for trim offset detection
 └── writers.py           # Write timestamps: piexif (photos), ffmpeg (videos)
 
 tests/
 ├── test_api.py
 ├── test_cli.py
+├── test_cli_fix_trim.py
 ├── test_cli_sync.py
 ├── test_models.py
 ├── test_constants.py
@@ -42,6 +44,7 @@ tests/
 ├── test_extractors.py
 ├── test_parsers.py
 ├── test_offset.py
+├── test_offset_detector.py
 ├── test_writers.py
 └── fixtures/            # Sample ffprobe JSON for parser tests
 ```
@@ -61,6 +64,7 @@ tests/
 - **Read:** Use `extract_metadata(path)` from `api.py`
 - **Write photos:** Use `write_photo_timestamp(path, datetime)` from `writers.py`
 - **Write videos:** Use `write_video_timestamp(path, datetime)` from `writers.py`
+- **Detect trim offset:** Use `detect_trim_offset(original, trimmed)` from `offset_detector.py`
 
 ### Error handling
 
@@ -97,6 +101,7 @@ uv add --dev <package>
 uv run photowalk info photo.jpg
 uv run photowalk batch ~/Photos/ --recursive
 uv run photowalk sync ~/Photos/ --offset "-2h" --dry-run
+uv run photowalk fix-trim original.mp4 trimmed.mp4 --dry-run
 ```
 
 ## Design Decisions
