@@ -68,7 +68,7 @@ def test_build_timeline_inline_image():
     seg1 = vt.segments[1]
     assert seg1.kind == "image"
     assert seg1.source_path == photo_path
-    assert seg1.start_time == photo_time
+    assert seg1.start_time == photo_time.replace(tzinfo=None)
 
     seg2 = vt.segments[2]
     assert seg2.kind == "video_segment"
@@ -200,3 +200,42 @@ def test_build_timeline_empty_list():
     assert len(result.video_timelines) == 0
     assert len(result.standalone_images) == 0
     assert len(result.all_entries) == 0
+
+
+def test_build_timeline_mixed_timezone_awareness():
+    """Regression: video timestamps from ffprobe are often timezone-aware,
+    while photo timestamps from EXIF are timezone-naive."""
+    video_path = Path("/tmp/video.mp4")
+    photo_path = Path("/tmp/photo.jpg")
+
+    # aware timestamp (like ffprobe produces)
+    video_start = datetime(2024, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+    video_end = datetime(2024, 7, 15, 12, 2, 0, tzinfo=timezone.utc)
+    # naive timestamp (like EXIF produces)
+    photo_time = datetime(2024, 7, 15, 12, 0, 30)
+
+    video_meta = VideoMetadata(
+        source_path=video_path,
+        start_timestamp=video_start,
+        end_timestamp=video_end,
+        duration_seconds=120.0,
+    )
+    photo_meta = PhotoMetadata(
+        source_path=photo_path,
+        timestamp=photo_time,
+    )
+
+    def _mock_extract(path):
+        if path == video_path:
+            return video_meta
+        if path == photo_path:
+            return photo_meta
+        return None
+
+    # This used to raise:
+    #   TypeError: can't compare offset-naive and offset-aware datetimes
+    with patch("photowalk.timeline.extract_metadata", side_effect=_mock_extract):
+        result = build_timeline([video_path, photo_path])
+
+    assert len(result.video_timelines) == 1
+    assert len(result.video_timelines[0].segments) == 3

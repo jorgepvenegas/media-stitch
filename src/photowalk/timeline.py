@@ -46,6 +46,17 @@ class TimelineMap:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _make_naive(dt: Optional[datetime]) -> Optional[datetime]:
+    """Strip timezone info from a datetime for consistent comparison.
+
+    EXIF timestamps are timezone-naive; ffprobe timestamps are often
+    timezone-aware.  The timeline builder needs to compare them.
+    """
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None)
+
+
 def _make_video_segments(
     video_path: Path,
     video_start: datetime,
@@ -127,7 +138,7 @@ def build_timeline(files: List[Path]) -> TimelineMap:
         if isinstance(meta, PhotoMetadata) and meta.timestamp is not None:
             photo_entries.append(
                 TimelineEntry(
-                    start_time=meta.timestamp,
+                    start_time=_make_naive(meta.timestamp),
                     duration_seconds=0.0,
                     kind="image",
                     source_path=path,
@@ -145,8 +156,8 @@ def build_timeline(files: List[Path]) -> TimelineMap:
                 video_timelines.append(
                     VideoTimeline(
                         video_path=path,
-                        video_start=meta.start_timestamp,
-                        video_end=end_ts,
+                        video_start=_make_naive(meta.start_timestamp),
+                        video_end=_make_naive(end_ts),
                     )
                 )
 
