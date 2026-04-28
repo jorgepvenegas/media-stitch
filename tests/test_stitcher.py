@@ -179,13 +179,15 @@ def test_stitch_video_segment():
     assert "pad=" in split_cmd[split_cmd.index("-vf") + 1]
 
 
-def test_split_video_segment_uses_custom_preset_and_crf():
-    from photowalk.stitcher import _split_video_segment  # internal helper, tested directly
+def test_split_video_segment_uses_custom_encode_config():
+    from photowalk.stitcher import _split_video_segment
+    from photowalk.ffmpeg_config import FfmpegEncodeConfig
+
     with patch("photowalk.stitcher.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         _split_video_segment(
             Path("in.mp4"), 0.0, 5.0, Path("out.mp4"), 640, 480,
-            preset="ultrafast", crf=28,
+            encode_config=FfmpegEncodeConfig.draft(),
         )
     cmd = mock_run.call_args[0][0]
     assert "-preset" in cmd
@@ -216,11 +218,13 @@ def test_compute_draft_resolution_preserves_aspect_ratio():
     assert abs(w / h - 2560 / 1600) < 0.01
 
 
-def test_run_concat_uses_custom_preset_and_crf():
+def test_run_concat_uses_custom_encode_config():
     from photowalk.stitcher import run_concat
+    from photowalk.ffmpeg_config import FfmpegEncodeConfig
+
     with patch("photowalk.stitcher.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        run_concat(Path("list.txt"), Path("out.mp4"), preset="ultrafast", crf=28)
+        run_concat(Path("list.txt"), Path("out.mp4"), encode_config=FfmpegEncodeConfig.draft())
     cmd = mock_run.call_args[0][0]
     preset_idx = cmd.index("-preset")
     assert cmd[preset_idx + 1] == "ultrafast"
@@ -317,8 +321,8 @@ def test_stitch_draft_mode_uses_draft_params():
     assert result is True
     mock_clip.assert_called_once()
     _, kwargs = mock_clip.call_args
-    assert kwargs["preset"] == "ultrafast"
-    assert kwargs["crf"] == 28
+    assert kwargs["encode_config"].preset == "ultrafast"
+    assert kwargs["encode_config"].crf == 28
 
     # Check resolution passed to generate_image_clip is reduced
     args = mock_clip.call_args[0]

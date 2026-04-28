@@ -5,9 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-
-def ffprobe_not_found_error() -> str:
-    return "ffprobe not found in PATH. Install FFmpeg: https://ffmpeg.org"
+from photowalk.ffmpeg_config import ffmpeg_not_found_error
 
 
 def run_ffprobe(path: Path) -> Optional[dict]:
@@ -28,7 +26,7 @@ def run_ffprobe(path: Path) -> Optional[dict]:
             check=False,
         )
     except FileNotFoundError:
-        raise RuntimeError(ffprobe_not_found_error())
+        raise RuntimeError(ffmpeg_not_found_error())
 
     if result.returncode != 0:
         return None

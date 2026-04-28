@@ -6,6 +6,11 @@ import uuid
 from pathlib import Path
 from typing import List
 
+from photowalk.ffmpeg_config import (
+    FfmpegEncodeConfig,
+    build_scale_pad_filter,
+    ffmpeg_not_found_error,
+)
 from photowalk.image_clip import generate_image_clip
 from photowalk.timeline import TimelineEntry, TimelineMap
 
@@ -21,6 +26,11 @@ def compute_draft_resolution(width: int, height: int) -> tuple[int, int]:
     w = int(width * scale)
     h = int(height * scale)
     return (w // 2) * 2, (h // 2) * 2
+
+
+def _resolve_encode_config(draft: bool) -> FfmpegEncodeConfig:
+    """Return the appropriate encoding config for draft or final quality."""
+    return FfmpegEncodeConfig.draft() if draft else FfmpegEncodeConfig()
 
 
 def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
@@ -40,8 +50,10 @@ def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
     return output_path
 
 
-def run_concat(concat_list_path: Path, output_path: Path, preset: str = "fast", crf: int = 23) -> bool:
+def run_concat(concat_list_path: Path, output_path: Path, encode_config: FfmpegEncodeConfig | None = None) -> bool:
     """Run ffmpeg concat demuxer."""
+    if encode_config is None:
+        encode_config = FfmpegEncodeConfig()
     cmd = [
         "ffmpeg",
         "-y",
@@ -49,8 +61,8 @@ def run_concat(concat_list_path: Path, output_path: Path, preset: str = "fast", 
         "-safe", "0",
         "-i", str(concat_list_path),
         "-c:v", "libx264",
-        "-preset", preset,
-        "-crf", str(crf),
+        "-preset", encode_config.preset,
+        "-crf", str(encode_config.crf),
         "-c:a", "aac",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
@@ -59,7 +71,7 @@ def run_concat(concat_list_path: Path, output_path: Path, preset: str = "fast", 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     except FileNotFoundError:
-        raise RuntimeError("ffmpeg not found in PATH. Install FFmpeg: https://ffmpeg.org")
+        raise RuntimeError(ffmpeg_not_found_error())
     return result.returncode == 0
 
 
@@ -70,30 +82,32 @@ def _split_video_segment(
     output_path: Path,
     frame_width: int,
     frame_height: int,
-    preset: str = "fast",
-    crf: int = 23,
+    encode_config: FfmpegEncodeConfig | None = None,
 ) -> bool:
     """Extract a segment from a video using ffmpeg trim.
 
     Re-encodes instead of -c copy to ensure frame-accurate cuts at
     non-keyframe boundaries.
     """
+    if encode_config is None:
+        encode_config = FfmpegEncodeConfig()
     duration = trim_end - trim_start
+    vf = build_scale_pad_filter(frame_width, frame_height)
     cmd = [
         "ffmpeg",
         "-y",
         "-ss", str(trim_start),
         "-i", str(video_path),
         "-t", str(duration),
-        "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+        "-vf", vf,
         "-c:v", "libx264",
-        "-preset", preset,
-        "-crf", str(crf),
+        "-preset", encode_config.preset,
+        "-crf", str(encode_config.crf),
         "-c:a", "aac",
-        "-b:a", "128k",
-        "-ar", "48000",
-        "-r", "30",
-        "-video_track_timescale", "15360",
+        "-b:a", encode_config.audio_bitrate,
+        "-ar", str(encode_config.audio_sample_rate),
+        "-r", str(encode_config.fps),
+        "-video_track_timescale", str(encode_config.video_track_timescale),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
         str(output_path),
@@ -101,7 +115,7 @@ def _split_video_segment(
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     except FileNotFoundError:
-        raise RuntimeError("ffmpeg not found in PATH. Install FFmpeg: https://ffmpeg.org")
+        raise RuntimeError(ffmpeg_not_found_error())
     return result.returncode == 0
 
 
@@ -114,14 +128,9 @@ def generate_plan(
     draft: bool = False,
 ) -> dict:
     """Generate a plan dict describing how stitch() would process the timeline."""
+    encode_config = _resolve_encode_config(draft)
     if draft:
         frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
-        preset = "ultrafast"
-        crf = 28
-    else:
-        preset = "fast"
-        crf = 23
-
     temp_dir = Path(tempfile.gettempdir()) / f"photowalk_stitch_{uuid.uuid4().hex[:8]}"
     timeline_entries = []
     ffmpeg_commands = []
@@ -129,15 +138,16 @@ def generate_plan(
     for entry in timeline_map.all_entries:
         if entry.kind == "image":
             clip_path = temp_dir / f"img_{entry.source_path.stem}.mp4"
+            vf = build_scale_pad_filter(frame_width, frame_height)
             cmd = [
                 "ffmpeg", "-y",
                 "-loop", "1",
                 "-i", str(entry.source_path.resolve()),
                 "-t", str(image_duration),
-                "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+                "-vf", vf,
                 "-c:v", "libx264",
-                "-preset", preset,
-                "-crf", str(crf),
+                "-preset", encode_config.preset,
+                "-crf", str(encode_config.crf),
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 str(clip_path),
@@ -161,20 +171,21 @@ def generate_plan(
         elif entry.kind == "video_segment":
             seg_path = temp_dir / f"seg_{entry.trim_start:.3f}_{entry.source_path.stem}.mp4"
             duration = (entry.trim_end or 0) - (entry.trim_start or 0)
+            vf = build_scale_pad_filter(frame_width, frame_height)
             cmd = [
                 "ffmpeg", "-y",
                 "-ss", str(entry.trim_start or 0.0),
                 "-i", str(entry.source_path.resolve()),
                 "-t", str(duration),
-                "-vf", f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=decrease,pad={frame_width}:{frame_height}:(ow-iw)/2:(oh-ih)/2:white",
+                "-vf", vf,
                 "-c:v", "libx264",
-                "-preset", preset,
-                "-crf", str(crf),
+                "-preset", encode_config.preset,
+                "-crf", str(encode_config.crf),
                 "-c:a", "aac",
-                "-b:a", "128k",
-                "-ar", "48000",
-                "-r", "30",
-                "-video_track_timescale", "15360",
+                "-b:a", encode_config.audio_bitrate,
+                "-ar", str(encode_config.audio_sample_rate),
+                "-r", str(encode_config.fps),
+                "-video_track_timescale", str(encode_config.video_track_timescale),
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 str(seg_path),
@@ -203,8 +214,8 @@ def generate_plan(
         "-safe", "0",
         "-i", str(concat_list_path),
         "-c:v", "libx264",
-        "-preset", preset,
-        "-crf", str(crf),
+        "-preset", encode_config.preset,
+        "-crf", str(encode_config.crf),
         "-c:a", "aac",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
@@ -241,13 +252,9 @@ def stitch(
 ) -> bool:
     """Stitch all segments into a single output video."""
     temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
+    encode_config = _resolve_encode_config(draft)
     if draft:
         frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
-        preset = "ultrafast"
-        crf = 28
-    else:
-        preset = "fast"
-        crf = 23
     try:
         # Generate image clips and split video segments
         for entry in timeline_map.all_entries:
@@ -259,8 +266,7 @@ def stitch(
                     frame_width,
                     frame_height,
                     image_duration,
-                    preset=preset,
-                    crf=crf,
+                    encode_config=encode_config,
                 )
                 if not ok:
                     return False
@@ -275,8 +281,7 @@ def stitch(
                     seg_path,
                     frame_width,
                     frame_height,
-                    preset=preset,
-                    crf=crf,
+                    encode_config=encode_config,
                 )
                 if not ok:
                     return False
@@ -284,7 +289,7 @@ def stitch(
 
         concat_list_path = temp_dir / "concat_list.txt"
         build_concat_list(timeline_map.all_entries, concat_list_path)
-        ok = run_concat(concat_list_path, output_path, preset=preset, crf=crf)
+        ok = run_concat(concat_list_path, output_path, encode_config=encode_config)
         return ok
     finally:
         if keep_temp:

@@ -6,6 +6,8 @@ from typing import Tuple
 
 from PIL import Image
 
+from photowalk.ffmpeg_config import FfmpegEncodeConfig, build_scale_pad_filter, ffmpeg_not_found_error
+
 
 def compute_scaled_dimensions(
     img_width: int, img_height: int, frame_width: int, frame_height: int
@@ -23,8 +25,7 @@ def generate_image_clip(
     frame_width: int,
     frame_height: int,
     duration: float = 3.5,
-    preset: str = "fast",
-    crf: int = 23,
+    encode_config: FfmpegEncodeConfig | None = None,
 ) -> bool:
     """Generate a video clip with white background and centered image."""
     try:
@@ -37,6 +38,9 @@ def generate_image_clip(
     x_offset = (frame_width - scaled_w) // 2
     y_offset = (frame_height - scaled_h) // 2
 
+    if encode_config is None:
+        encode_config = FfmpegEncodeConfig()
+
     filter_str = (
         f"color=c=white:s={frame_width}x{frame_height}:d={duration}[bg];"
         f"[bg][0:v]overlay={x_offset}:{y_offset}:enable='between(t,0,{duration})'"
@@ -46,19 +50,19 @@ def generate_image_clip(
         "ffmpeg",
         "-y",
         "-loop", "1",
-        "-framerate", "30",
+        "-framerate", str(encode_config.fps),
         "-i", str(image_path),
         "-f", "lavfi",
-        "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+        "-i", f"anullsrc=channel_layout=stereo:sample_rate={encode_config.audio_sample_rate}",
         "-vf", filter_str,
         "-c:v", "libx264",
-        "-preset", preset,
-        "-crf", str(crf),
+        "-preset", encode_config.preset,
+        "-crf", str(encode_config.crf),
         "-c:a", "aac",
-        "-b:a", "128k",
-        "-ar", "48000",
-        "-r", "30",
-        "-video_track_timescale", "15360",
+        "-b:a", encode_config.audio_bitrate,
+        "-ar", str(encode_config.audio_sample_rate),
+        "-r", str(encode_config.fps),
+        "-video_track_timescale", str(encode_config.video_track_timescale),
         "-t", str(duration),
         "-pix_fmt", "yuv420p",
         "-shortest",
@@ -68,6 +72,6 @@ def generate_image_clip(
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     except FileNotFoundError:
-        raise RuntimeError("ffmpeg not found in PATH. Install FFmpeg: https://ffmpeg.org")
+        raise RuntimeError(ffmpeg_not_found_error())
 
     return result.returncode == 0
