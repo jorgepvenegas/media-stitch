@@ -10,10 +10,16 @@ from photowalk.timeline import TimelineEntry, TimelineMap
 
 
 def _compute_draft_resolution(width: int, height: int) -> tuple[int, int]:
-    """Scale resolution proportionally so it fits within 1280x720."""
+    """Scale resolution proportionally so it fits within 1280x720.
+
+    Output dimensions are rounded down to the nearest even number so they
+    are always valid inputs for libx264 (which requires even width and height).
+    """
     max_w, max_h = 1280, 720
     scale = min(max_w / width, max_h / height, 1.0)
-    return int(width * scale), int(height * scale)
+    w = int(width * scale)
+    h = int(height * scale)
+    return (w // 2) * 2, (h // 2) * 2
 
 
 def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
