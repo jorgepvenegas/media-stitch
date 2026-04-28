@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pytest
 
-from photowalk.offset_detector import extract_audio, OffsetDetectionError, _load_audio
+from photowalk.offset_detector import extract_audio, OffsetDetectionError, _load_audio, find_audio_offset
 
 
 class TestExtractAudio:
@@ -73,3 +73,32 @@ class TestLoadAudio:
         assert arr[0] == 100.0
         assert arr[1] == -200.0
         assert arr[2] == 300.0
+
+
+class TestFindAudioOffset:
+    def test_detects_known_offset_with_noise(self):
+        rng = np.random.default_rng(123)
+        sample_rate = 16000
+        original = rng.standard_normal(32000).astype(np.float32)
+
+        start_sample = int(0.5 * sample_rate)
+        trim_duration = 1
+        trimmed = original[start_sample : start_sample + trim_duration * sample_rate]
+
+        offset = find_audio_offset(original, trimmed, sample_rate)
+        assert abs(offset - 0.5) < 0.01
+
+    def test_low_confidence_raises(self):
+        rng = np.random.default_rng(42)
+        original = rng.standard_normal(16000).astype(np.float32)
+        trimmed = rng.standard_normal(8000).astype(np.float32)
+
+        with pytest.raises(OffsetDetectionError, match="confidence"):
+            find_audio_offset(original, trimmed, 16000)
+
+    def test_trimmed_longer_than_original_raises(self):
+        original = np.ones(1000, dtype=np.float32)
+        trimmed = np.ones(2000, dtype=np.float32)
+
+        with pytest.raises(OffsetDetectionError, match="longer than original"):
+            find_audio_offset(original, trimmed, 16000)

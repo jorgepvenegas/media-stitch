@@ -6,6 +6,7 @@ import wave
 from pathlib import Path
 
 import numpy as np
+from scipy import signal
 
 
 class OffsetDetectionError(Exception):
@@ -61,3 +62,29 @@ def _load_audio(path: Path) -> tuple[np.ndarray, int]:
             arr = arr.reshape(-1, nchannels).mean(axis=1)
 
         return arr.astype(np.float32), framerate
+
+
+def find_audio_offset(original: np.ndarray, trimmed: np.ndarray, sample_rate: int) -> float:
+    """Find the temporal offset (in seconds) of trimmed audio within original audio via cross-correlation.
+
+    Raises OffsetDetectionError if the correlation confidence is below 0.5 or if
+    trimmed is longer than original.
+    """
+    if len(trimmed) > len(original):
+        raise OffsetDetectionError("Trimmed audio is longer than original")
+
+    original_norm = (original - original.mean()) / (original.std() + 1e-10)
+    trimmed_norm = (trimmed - trimmed.mean()) / (trimmed.std() + 1e-10)
+
+    correlation = signal.correlate(original_norm, trimmed_norm, mode="valid", method="fft")
+    peak_idx = int(np.argmax(correlation))
+    peak_val = float(correlation[peak_idx])
+
+    confidence = peak_val / len(trimmed_norm)
+    if confidence < 0.5:
+        raise OffsetDetectionError(
+            f"Could not reliably detect trim point (confidence: {confidence:.2f}). "
+            "Videos may be too different."
+        )
+
+    return float(peak_idx / sample_rate)
