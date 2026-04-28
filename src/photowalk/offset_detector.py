@@ -88,3 +88,41 @@ def find_audio_offset(original: np.ndarray, trimmed: np.ndarray, sample_rate: in
         )
 
     return float(peak_idx / sample_rate)
+
+
+def detect_trim_offset(original_path: Path, trimmed_path: Path) -> float:
+    """Detect the temporal offset (in seconds) of a trimmed video relative to its original.
+
+    Extracts audio from both videos, loads the WAV data, and runs cross-correlation.
+    Cleans up temporary files regardless of success or failure.
+    Raises OffsetDetectionError on any failure.
+    """
+    original_wav: Path | None = None
+    trimmed_wav: Path | None = None
+
+    try:
+        original_wav = extract_audio(original_path)
+        trimmed_wav = extract_audio(trimmed_path)
+
+        original_audio, original_sr = _load_audio(original_wav)
+        trimmed_audio, trimmed_sr = _load_audio(trimmed_wav)
+
+        if original_sr != trimmed_sr:
+            raise OffsetDetectionError(
+                f"Sample rate mismatch: {original_sr} vs {trimmed_sr}"
+            )
+
+        offset = find_audio_offset(original_audio, trimmed_audio, original_sr)
+
+        original_duration = len(original_audio) / original_sr
+        if offset > original_duration:
+            raise OffsetDetectionError(
+                f"Detected offset ({offset:.2f}s) exceeds original duration"
+            )
+
+        return offset
+    finally:
+        if original_wav is not None:
+            original_wav.unlink(missing_ok=True)
+        if trimmed_wav is not None:
+            trimmed_wav.unlink(missing_ok=True)

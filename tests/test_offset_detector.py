@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pytest
 
-from photowalk.offset_detector import extract_audio, OffsetDetectionError, _load_audio, find_audio_offset
+from photowalk.offset_detector import extract_audio, OffsetDetectionError, _load_audio, find_audio_offset, detect_trim_offset
 
 
 class TestExtractAudio:
@@ -102,3 +102,74 @@ class TestFindAudioOffset:
 
         with pytest.raises(OffsetDetectionError, match="longer than original"):
             find_audio_offset(original, trimmed, 16000)
+
+
+class TestDetectTrimOffset:
+    def test_orchestrates_extraction_and_finds_offset(self, tmp_path):
+        rng = np.random.default_rng(456)
+        orig_wav = tmp_path / "orig.wav"
+        trim_wav = tmp_path / "trim.wav"
+        orig_wav.write_text("dummy")
+        trim_wav.write_text("dummy")
+
+        original = rng.standard_normal(32000).astype(np.float32)
+        start_sample = int(0.5 * 16000)
+        trimmed = original[start_sample : start_sample + 16000]
+
+        with patch("photowalk.offset_detector.extract_audio", side_effect=[orig_wav, trim_wav]) as mock_extract:
+            with patch(
+                "photowalk.offset_detector._load_audio",
+                side_effect=[
+                    (original, 16000),
+                    (trimmed, 16000),
+                ],
+            ) as mock_load:
+                result = detect_trim_offset(Path("orig.mp4"), Path("trim.mp4"))
+
+        assert abs(result - 0.5) < 0.01
+        assert mock_extract.call_count == 2
+        mock_load.assert_called()
+
+    def test_cleans_up_temp_files(self, tmp_path):
+        rng = np.random.default_rng(789)
+        orig_wav = tmp_path / "orig.wav"
+        trim_wav = tmp_path / "trim.wav"
+        orig_wav.write_text("dummy")
+        trim_wav.write_text("dummy")
+
+        original = rng.standard_normal(32000).astype(np.float32)
+        start_sample = int(0.5 * 16000)
+        trimmed = original[start_sample : start_sample + 16000]
+
+        with patch("photowalk.offset_detector.extract_audio", side_effect=[orig_wav, trim_wav]):
+            with patch(
+                "photowalk.offset_detector._load_audio",
+                side_effect=[
+                    (original, 16000),
+                    (trimmed, 16000),
+                ],
+            ):
+                detect_trim_offset(Path("orig.mp4"), Path("trim.mp4"))
+
+        assert not orig_wav.exists()
+        assert not trim_wav.exists()
+
+    def test_sample_rate_mismatch_raises(self, tmp_path):
+        orig_wav = tmp_path / "orig.wav"
+        trim_wav = tmp_path / "trim.wav"
+        orig_wav.write_text("dummy")
+        trim_wav.write_text("dummy")
+
+        with patch("photowalk.offset_detector.extract_audio", side_effect=[orig_wav, trim_wav]):
+            with patch(
+                "photowalk.offset_detector._load_audio",
+                side_effect=[
+                    (np.array([1.0, 2.0], dtype=np.float32), 16000),
+                    (np.array([1.0, 2.0], dtype=np.float32), 22050),
+                ],
+            ):
+                with pytest.raises(OffsetDetectionError, match="Sample rate mismatch"):
+                    detect_trim_offset(Path("orig.mp4"), Path("trim.mp4"))
+
+        assert not orig_wav.exists()
+        assert not trim_wav.exists()
