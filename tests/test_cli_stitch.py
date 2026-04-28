@@ -87,3 +87,45 @@ def test_stitch_invalid_format():
             result = runner.invoke(main, ["stitch", ".", "--output", "out.mp4", "--format", "bad"])
     assert result.exit_code == 1
     assert "1920x1080" in result.output or "WIDTHxHEIGHT" in result.output
+
+
+def test_stitch_plan_writes_json():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("video.mp4").touch()
+        Path("photo.jpg").touch()
+
+        mock_timeline = _make_mock_timeline()
+
+        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+            result = runner.invoke(main, [
+                "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
+            ])
+
+        assert result.exit_code == 0
+        assert Path("plan.json").exists()
+
+        import json
+        plan = json.loads(Path("plan.json").read_text())
+        assert plan["settings"]["output"] == "out.mp4"
+        assert "timeline" in plan
+        assert "ffmpeg_commands" in plan
+        assert "temp_dir" in plan
+
+
+def test_stitch_plan_no_video_generation():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("video.mp4").touch()
+
+        mock_timeline = _make_mock_timeline()
+
+        with patch("photowalk.cli.build_timeline", return_value=mock_timeline):
+            with patch("photowalk.cli.stitch") as mock_stitch:
+                result = runner.invoke(main, [
+                    "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
+                ])
+
+    assert result.exit_code == 0
+    mock_stitch.assert_not_called()
+    assert not Path("out.mp4").exists()

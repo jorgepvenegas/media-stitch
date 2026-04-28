@@ -335,7 +335,8 @@ def fix_trim(original, trimmed, output, dry_run):
 @click.option("--dry-run", is_flag=True, help="Preview timeline without generating output")
 @click.option("--recursive", "-r", is_flag=True, help="Scan directories recursively")
 @click.option("--draft", is_flag=True, help="Render a low-quality draft for faster preview")
-def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft):
+@click.option("--plan", type=click.Path(path_type=Path), help="Write stitch plan as JSON and exit")
+def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft, plan):
     """Stitch photos and videos into a single chronological video."""
     files = _collect_files([path], recursive)
     files = [f for f in files if f.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS]
@@ -373,6 +374,15 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
                     break
             except Exception:
                 pass
+
+    if plan:
+        import json
+        from photowalk.stitcher import generate_plan
+
+        plan_data = generate_plan(timeline, output, frame_width, frame_height, image_duration, draft)
+        plan.write_text(json.dumps(plan_data, indent=2))
+        click.echo(f"Plan written to {plan}")
+        return
 
     # Show timeline preview
     lines = [f"{'Start':<25} {'Duration':<10} {'Type':<15} {'Source'}"]
