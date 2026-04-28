@@ -2,6 +2,7 @@
 
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import List
 
@@ -121,7 +122,7 @@ def generate_plan(
         preset = "fast"
         crf = 23
 
-    temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
+    temp_dir = Path(tempfile.gettempdir()) / f"photowalk_stitch_{uuid.uuid4().hex[:8]}"
     timeline_entries = []
     ffmpeg_commands = []
 
