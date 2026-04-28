@@ -34,7 +34,10 @@ def run_concat(concat_list_path: Path, output_path: Path) -> bool:
         "-f", "concat",
         "-safe", "0",
         "-i", str(concat_list_path),
-        "-c", "copy",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
         str(output_path),
     ]
     try:
@@ -55,10 +58,11 @@ def _split_video_segment(
     cmd = [
         "ffmpeg",
         "-y",
-        "-i", str(video_path),
         "-ss", str(trim_start),
+        "-i", str(video_path),
         "-t", str(duration),
         "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
         str(output_path),
     ]
     try:

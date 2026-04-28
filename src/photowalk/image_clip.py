@@ -49,6 +49,7 @@ def generate_image_clip(
         "-c:v", "libx264",
         "-t", str(duration),
         "-pix_fmt", "yuv420p",
+        "-an",
         str(output_path),
     ]
 
