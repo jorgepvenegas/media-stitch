@@ -177,3 +177,20 @@ def test_stitch_video_segment():
     assert "libx264" in split_cmd
     assert "scale=" in split_cmd[split_cmd.index("-vf") + 1]
     assert "pad=" in split_cmd[split_cmd.index("-vf") + 1]
+
+
+def test_compute_draft_resolution_scales_down():
+    from photowalk.stitcher import _compute_draft_resolution
+    assert _compute_draft_resolution(1920, 1080) == (1280, 720)
+
+
+def test_compute_draft_resolution_preserves_small():
+    from photowalk.stitcher import _compute_draft_resolution
+    assert _compute_draft_resolution(640, 480) == (640, 480)
+
+
+def test_compute_draft_resolution_preserves_aspect_ratio():
+    from photowalk.stitcher import _compute_draft_resolution
+    w, h = _compute_draft_resolution(1920, 1080)
+    assert w == 1280
+    assert h == 720

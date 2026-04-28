@@ -9,6 +9,13 @@ from photowalk.image_clip import generate_image_clip
 from photowalk.timeline import TimelineEntry, TimelineMap
 
 
+def _compute_draft_resolution(width: int, height: int) -> tuple[int, int]:
+    """Scale resolution proportionally so it fits within 1280x720."""
+    max_w, max_h = 1280, 720
+    scale = min(max_w / width, max_h / height, 1.0)
+    return int(width * scale), int(height * scale)
+
+
 def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
     """Write an ffmpeg concat demuxer list file.
 
