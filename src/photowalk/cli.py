@@ -1,6 +1,7 @@
 """Click CLI for photowalk."""
 
 import json
+import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
 from photowalk.extractors import ffprobe_not_found_error, run_ffprobe
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.offset import compute_offset, OffsetError
+from photowalk.offset_detector import detect_trim_offset, OffsetDetectionError
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
 
@@ -256,6 +258,69 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
     if fail_count:
         msg += f" {fail_count} failed."
     click.echo(msg)
+
+
+@main.command("fix-trim")
+@click.argument("original", type=click.Path(exists=True, path_type=Path))
+@click.argument("trimmed", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(path_type=Path),
+    help="Output path instead of updating in place",
+)
+@click.option("--dry-run", is_flag=True, help="Preview changes without writing")
+def fix_trim(original, trimmed, output, dry_run):
+    """Detect trim offset between ORIGINAL and TRIMMED videos, then sync the timestamp."""
+    for path, label in [(original, "ORIGINAL"), (trimmed, "TRIMMED")]:
+        if path.suffix.lower() not in VIDEO_EXTENSIONS:
+            click.echo(
+                click.style(f"Error: {label} must be a video file", fg="red"),
+                err=True,
+            )
+            raise click.Exit(1)
+
+    original_meta = extract_metadata(original)
+    if not isinstance(original_meta, VideoMetadata) or original_meta.start_timestamp is None:
+        click.echo(
+            click.style("Error: Could not read start timestamp from original video", fg="red"),
+            err=True,
+        )
+        raise click.Exit(1)
+
+    try:
+        offset_seconds = detect_trim_offset(original, trimmed)
+    except OffsetDetectionError as e:
+        click.echo(click.style(f"Error: {e}", fg="red"), err=True)
+        raise click.Exit(1)
+
+    adjusted_start = original_meta.start_timestamp + timedelta(seconds=offset_seconds)
+
+    trimmed_meta = extract_metadata(trimmed)
+    duration = trimmed_meta.duration_seconds if isinstance(trimmed_meta, VideoMetadata) else None
+    adjusted_end = adjusted_start + timedelta(seconds=duration) if duration else None
+
+    if dry_run:
+        click.echo(f"Detected offset: {offset_seconds:.3f}s")
+        click.echo(f"Original start:  {original_meta.start_timestamp.isoformat()}")
+        click.echo(f"Adjusted start:  {adjusted_start.isoformat()}")
+        if adjusted_end:
+            click.echo(f"Adjusted end:    {adjusted_end.isoformat()}")
+        return
+
+    target_path = output if output else trimmed
+    if output:
+        shutil.copy2(trimmed, output)
+
+    ok = write_video_timestamp(target_path, adjusted_start)
+    if not ok:
+        click.echo(
+            click.style(f"Error: Failed to write timestamp to {target_path}", fg="red"),
+            err=True,
+        )
+        raise click.Exit(1)
+
+    click.echo(f"Updated {target_path}")
 
 
 if __name__ == "__main__":
