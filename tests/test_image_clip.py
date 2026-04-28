@@ -67,7 +67,9 @@ def test_generate_image_clip_returns_false_on_image_open_error():
     assert result is False
 
 
-def test_generate_image_clip_uses_custom_preset_and_crf():
+def test_generate_image_clip_uses_custom_encode_config():
+    from photowalk.ffmpeg_config import FfmpegEncodeConfig
+
     with patch("photowalk.image_clip.Image.open") as mock_open:
         mock_img = MagicMock()
         mock_img.size = (1920, 1080)
@@ -77,7 +79,7 @@ def test_generate_image_clip_uses_custom_preset_and_crf():
             mock_run.return_value = MagicMock(returncode=0)
             result = generate_image_clip(
                 Path("photo.jpg"), Path("clip.mp4"), 1920, 1080,
-                preset="ultrafast", crf=28,
+                encode_config=FfmpegEncodeConfig.draft(),
             )
 
     assert result is True

@@ -1,7 +1,8 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from photowalk.extractors import run_ffprobe, ffprobe_not_found_error
+from photowalk.extractors import run_ffprobe
+from photowalk.ffmpeg_config import ffmpeg_not_found_error
 
 
 def test_run_ffprobe_success():
@@ -47,6 +48,6 @@ def test_run_ffprobe_file_not_found():
     assert result is None
 
 
-def test_ffprobe_not_found_error():
-    assert "ffprobe" in ffprobe_not_found_error()
-    assert "FFmpeg" in ffprobe_not_found_error()
+def test_ffmpeg_not_found_error():
+    assert "ffmpeg" in ffmpeg_not_found_error()
+    assert "FFmpeg" in ffmpeg_not_found_error()

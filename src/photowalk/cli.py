@@ -12,15 +12,20 @@ from photowalk.api import extract_metadata
 from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
 from photowalk.timeline import build_timeline
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
-from photowalk.extractors import ffprobe_not_found_error, run_ffprobe
+from photowalk.extractors import run_ffprobe
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.offset import compute_offset, OffsetError
 from photowalk.offset_detector import detect_trim_offset, OffsetDetectionError
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
 
-def _collect_files(paths: list[Path], recursive: bool) -> list[Path]:
-    """Collect media files from a list of paths."""
+def _collect_files(
+    paths: list[Path],
+    recursive: bool,
+    include_photos: bool = True,
+    include_videos: bool = True,
+) -> list[Path]:
+    """Collect media files from a list of paths, with optional type filtering."""
     files = []
     for path in paths:
         if path.is_file():
@@ -31,6 +36,12 @@ def _collect_files(paths: list[Path], recursive: bool) -> list[Path]:
             for child in path.glob(pattern):
                 if child.is_file() and child.suffix.lower() in PHOTO_EXTENSIONS | VIDEO_EXTENSIONS:
                     files.append(child)
+
+    if not include_photos:
+        files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
+    if not include_videos:
+        files = [f for f in files if f.suffix.lower() not in VIDEO_EXTENSIONS]
+
     return files
 
 
@@ -117,15 +128,10 @@ def info(path: Path):
 def batch(paths, output, recursive, include_photos, include_videos):
     """Process multiple files or directories."""
     try:
-        files = _collect_files(list(paths), recursive)
+        files = _collect_files(list(paths), recursive, include_photos, include_videos)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
         raise Exit(1)
-
-    if not include_photos:
-        files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
-    if not include_videos:
-        files = [f for f in files if f.suffix.lower() not in VIDEO_EXTENSIONS]
 
     if not files:
         click.echo("No media files found.")
@@ -163,15 +169,10 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
         raise Exit(1)
 
     try:
-        files = _collect_files(list(paths), recursive)
+        files = _collect_files(list(paths), recursive, include_photos, include_videos)
     except RuntimeError as e:
         click.echo(click.style(str(e), fg="red"), err=True)
         raise Exit(1)
-
-    if not include_photos:
-        files = [f for f in files if f.suffix.lower() not in PHOTO_EXTENSIONS]
-    if not include_videos:
-        files = [f for f in files if f.suffix.lower() not in VIDEO_EXTENSIONS]
 
     if not files:
         click.echo("No media files found.")

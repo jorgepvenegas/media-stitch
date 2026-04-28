@@ -1,6 +1,6 @@
 """Parse ffprobe JSON output into typed metadata models."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -31,48 +31,6 @@ def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
         return datetime.fromisoformat(normalized)
     except ValueError:
         return None
-
-
-def _get_tag(data: dict, *keys: str) -> Optional[str]:
-    """Walk into ffprobe format.tags and return the first matching key."""
-    tags = data.get("format", {}).get("tags") or {}
-    for key in keys:
-        if key in tags:
-            return tags[key]
-    return None
-
-
-def parse_photo(path: Path, data: dict) -> PhotoMetadata:
-    """Parse ffprobe JSON into PhotoMetadata."""
-    tags = data.get("format", {}).get("tags") or {}
-
-    timestamp = _parse_timestamp(_get_tag(data, "creation_time", "date"))
-
-    camera_model = _build_camera_model(
-        tags.get("Make", ""),
-        tags.get("Model", ""),
-    )
-
-    shutter_speed = _get_tag(data, "ExposureTime", "ShutterSpeedValue")
-
-    iso_raw = _get_tag(data, "ISOSpeedRatings", "ISO")
-    iso = None
-    if iso_raw:
-        try:
-            iso = int(iso_raw)
-        except ValueError:
-            iso = None
-
-    focal_length = _get_tag(data, "FocalLength")
-
-    return PhotoMetadata(
-        source_path=path,
-        timestamp=timestamp,
-        camera_model=camera_model,
-        shutter_speed=shutter_speed,
-        iso=iso,
-        focal_length=focal_length,
-    )
 
 
 def parse_photo_from_exif(path: Path, data: dict) -> PhotoMetadata:
