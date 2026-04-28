@@ -9,7 +9,7 @@ import click
 from click.exceptions import Exit
 
 from photowalk.api import extract_metadata
-from photowalk.stitcher import stitch, compute_draft_resolution
+from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
 from photowalk.timeline import build_timeline
 from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
 from photowalk.extractors import ffprobe_not_found_error, run_ffprobe
@@ -376,9 +376,6 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
                 pass
 
     if plan:
-        import json
-        from photowalk.stitcher import generate_plan
-
         plan_data = generate_plan(timeline, output, frame_width, frame_height, image_duration, draft)
         plan.write_text(json.dumps(plan_data, indent=2))
         click.echo(f"Plan written to {plan}")

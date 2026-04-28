@@ -11,12 +11,15 @@ from photowalk.timeline import TimelineEntry, TimelineMap, VideoTimeline
 
 
 def _make_mock_timeline():
-    """Build a minimal TimelineMap with one video entry."""
+    """Build a minimal TimelineMap with one video_segment entry."""
     entry = TimelineEntry(
         start_time=datetime.datetime(2024, 7, 15, 12, 0, 0),
         duration_seconds=120.0,
-        kind="video",
+        kind="video_segment",
         source_path=Path("video.mp4"),
+        original_video=Path("video.mp4"),
+        trim_start=0.0,
+        trim_end=120.0,
     )
     vt = VideoTimeline(
         video_path=Path("video.mp4"),
@@ -108,7 +111,8 @@ def test_stitch_plan_writes_json():
         import json
         plan = json.loads(Path("plan.json").read_text())
         assert plan["settings"]["output"] == "out.mp4"
-        assert "timeline" in plan
+        assert len(plan["timeline"]) == 1
+        assert plan["timeline"][0]["kind"] == "video_segment"
         assert "ffmpeg_commands" in plan
         assert "temp_dir" in plan
 
