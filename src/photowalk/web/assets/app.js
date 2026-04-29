@@ -120,6 +120,8 @@
       renderSidebar(allFiles);
       updateButtons();
     });
+
+    document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
   }
 
   function updateButtons() {
@@ -275,9 +277,81 @@
     }
   }
 
-  // Stubs filled in by later tasks
-  function renderQueue() { /* Task 13 */ }
-  async function addToQueue() { /* Task 13 */ }
+  function renderQueue() {
+    const container = document.getElementById('sync-queue');
+    container.innerHTML = '';
+    pendingStack.forEach((entry, idx) => {
+      const row = document.createElement('div');
+      row.className = 'queue-entry';
+
+      const left = document.createElement('span');
+      const sign = entry.delta_seconds >= 0 ? '+' : '';
+      const label = entry.source.kind === 'duration'
+        ? entry.source.text
+        : `ref ${sign}${Math.round(entry.delta_seconds)}s`;
+      const target = entry.target_paths.length === 1
+        ? entry.target_paths[0].split('/').pop()
+        : `${entry.target_paths.length} files`;
+      left.textContent = `${idx + 1}. ${label} → ${target}`;
+
+      const remove = document.createElement('button');
+      remove.textContent = '×';
+      remove.addEventListener('click', () => {
+        pendingStack.splice(idx, 1);
+        previewIsCurrent = false;
+        renderQueue();
+        updateButtons();
+      });
+
+      row.appendChild(left);
+      row.appendChild(remove);
+      container.appendChild(row);
+    });
+  }
+
+  async function addToQueue() {
+    const errEl = document.getElementById('sync-error');
+    errEl.textContent = '';
+
+    const mode = document.querySelector('input[name="sync-mode"]:checked').value;
+    let body;
+    if (mode === 'duration') {
+      const text = document.getElementById('sync-duration-input').value.trim();
+      if (!text) { errEl.textContent = 'Enter a duration'; return; }
+      body = { kind: 'duration', text };
+    } else {
+      const wrong = document.getElementById('sync-ref-wrong').value.trim();
+      const correct = document.getElementById('sync-ref-correct').value.trim();
+      if (!wrong || !correct) { errEl.textContent = 'Enter both timestamps'; return; }
+      body = { kind: 'reference', wrong, correct };
+    }
+
+    let parseRes;
+    try {
+      parseRes = await fetch('/api/offset/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(r => r.json());
+    } catch (e) {
+      errEl.textContent = 'Network error contacting server';
+      return;
+    }
+
+    if (parseRes.error) { errEl.textContent = parseRes.error; return; }
+
+    pendingStack.push({
+      id: crypto.randomUUID(),
+      delta_seconds: parseRes.delta_seconds,
+      source: body,
+      target_paths: [...selection],
+    });
+
+    previewIsCurrent = false;
+    renderQueue();
+    updateButtons();
+  }
+
   async function updateTimeline() { /* Task 14 */ }
   async function openApplyModal() { /* Task 15 */ }
 
