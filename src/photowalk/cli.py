@@ -25,6 +25,12 @@ from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
 from photowalk.timeline import build_timeline_from_files
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
+try:
+    from photowalk.web.server import build_app_from_path
+    HAS_WEB = True
+except ImportError:
+    HAS_WEB = False
+
 
 @click.group()
 @click.version_option(version="0.1.0")
@@ -319,6 +325,41 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
     else:
         click.echo(click.style("Error: Stitching failed.", fg="red"), err=True)
         raise Exit(1)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.option("--port", default=8080, type=int, help="Server port")
+@click.option("--recursive", "-r", is_flag=True)
+@click.option("--image-duration", default=3.5, type=float)
+def web(path, port, recursive, image_duration):
+    """Start a local web server for timeline preview."""
+    if not HAS_WEB:
+        click.echo(
+            click.style(
+                "Error: Web dependencies not installed. Run: uv pip install -e '.[web]'",
+                fg="red",
+            ),
+            err=True,
+        )
+        raise Exit(1)
+
+    try:
+        files = collect_files([path], recursive)
+    except RuntimeError as e:
+        click.echo(click.style(str(e), fg="red"), err=True)
+        raise Exit(1)
+
+    if not files:
+        click.echo("No media files found.")
+        return
+
+    app = build_app_from_path(path, recursive=recursive, image_duration=image_duration)
+    click.echo(click.style(f"Starting server at http://127.0.0.1:{port}", fg="green"))
+    click.echo("Press Ctrl+C to stop")
+
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
 
 if __name__ == "__main__":
