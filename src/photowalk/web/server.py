@@ -65,6 +65,35 @@ def create_app(
     app.state.image_duration = image_duration
     app.state.scan_files = scan_files
 
+    def _serialize_timeline(tl: TimelineMap) -> dict:
+        entries = []
+        for entry in tl.all_entries:
+            data = {
+                "kind": entry.kind,
+                "source_path": str(entry.source_path),
+                "start_time": entry.start_time.isoformat() if entry.start_time else None,
+                "duration_seconds": entry.duration_seconds,
+            }
+            if entry.kind == "video_segment":
+                data["trim_start"] = entry.trim_start
+                data["trim_end"] = entry.trim_end
+                data["original_video"] = str(entry.original_video) if entry.original_video else None
+            entries.append(data)
+        return {"entries": entries, "settings": {"image_duration": image_duration}}
+
+    app.state.timeline_response = _serialize_timeline(timeline)
+
+    if file_list is not None:
+        app.state.file_list = file_list
+    else:
+        _file_list: list[dict] = []
+        for _path in sorted(scan_files):
+            _meta = extract_metadata(_path)
+            if _meta is None:
+                continue
+            _file_list.append(_metadata_to_file_entry(_path, _meta))
+        app.state.file_list = _file_list
+
     @app.get("/", response_class=HTMLResponse)
     async def index():
         html = _load_asset("index.html")
@@ -81,37 +110,11 @@ def create_app(
 
     @app.get("/api/timeline")
     async def api_timeline():
-        entries = []
-        for entry in timeline.all_entries:
-            data = {
-                "kind": entry.kind,
-                "source_path": str(entry.source_path),
-                "start_time": entry.start_time.isoformat() if entry.start_time else None,
-                "duration_seconds": entry.duration_seconds,
-            }
-            if entry.kind == "video_segment":
-                data["trim_start"] = entry.trim_start
-                data["trim_end"] = entry.trim_end
-                data["original_video"] = str(entry.original_video) if entry.original_video else None
-            entries.append(data)
-        return {"entries": entries, "settings": {"image_duration": image_duration}}
-
-    # Precompute file metadata once at app-creation time so that every
-    # GET /api/files request is served from memory — not by re-running
-    # extract_metadata (and ffprobe for videos) on every call.
-    if file_list is not None:
-        _file_list = file_list
-    else:
-        _file_list: list[dict] = []
-        for _path in sorted(scan_files):
-            _meta = extract_metadata(_path)
-            if _meta is None:
-                continue
-            _file_list.append(_metadata_to_file_entry(_path, _meta))
+        return app.state.timeline_response
 
     @app.get("/api/files")
     async def api_files():
-        return {"files": _file_list}
+        return {"files": app.state.file_list}
 
     @app.get("/media/{path:path}")
     async def media(path: str):
@@ -163,11 +166,15 @@ def create_app(
         app.state.metadata_pairs = refreshed_pairs
 
         preview = build_preview(refreshed_pairs, [], image_duration=app.state.image_duration)
+        timeline_response = {"entries": preview["entries"], "settings": preview["settings"]}
+        app.state.file_list = preview["files"]
+        app.state.timeline_response = timeline_response
+
         return {
             "applied": result["applied"],
             "failed": result["failed"],
             "files": preview["files"],
-            "timeline": {"entries": preview["entries"], "settings": preview["settings"]},
+            "timeline": timeline_response,
         }
 
     return app

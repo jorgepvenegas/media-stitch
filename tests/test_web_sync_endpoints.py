@@ -293,3 +293,45 @@ def test_apply_partial_failure_returns_both_lists(monkeypatch):
     applied_paths = [a_["path"] for a_ in body["applied"]]
     assert failed_paths == ["/tmp/a.jpg"]
     assert applied_paths == ["/tmp/b.jpg"]
+
+
+def test_get_files_reflects_disk_after_apply(monkeypatch):
+    """After /api/sync/apply, GET /api/files must return refreshed state, not stale closure."""
+    img = Path("/tmp/a.jpg")
+    initial = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0))
+    refreshed = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 13, 0, 0))
+    pairs = [(img, initial)]
+
+    app = create_app(
+        {img},
+        TimelineMap(),
+        metadata_pairs=pairs,
+        file_list=[{
+            "path": str(img),
+            "type": "photo",
+            "timestamp": "2024-01-01T12:00:00",
+            "duration_seconds": None,
+            "has_timestamp": True,
+        }],
+    )
+
+    monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", lambda p, d: True)
+    monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
+    monkeypatch.setattr("photowalk.web.server.extract_metadata", lambda p: refreshed)
+
+    client = TestClient(app)
+    client.post(
+        "/api/sync/apply",
+        json={
+            "offsets": [{
+                "id": "1",
+                "delta_seconds": 3600.0,
+                "source": {"kind": "duration", "text": "+1h"},
+                "target_paths": [str(img)],
+            }]
+        },
+    )
+
+    r = client.get("/api/files")
+    files = r.json()["files"]
+    assert files[0]["timestamp"] == "2024-01-01T13:00:00"
