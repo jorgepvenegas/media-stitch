@@ -6,6 +6,7 @@ from pathlib import Path
 
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import MediaInput, build_timeline
+from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.web.sync_models import OffsetEntry
 
 
@@ -91,29 +92,6 @@ def _serialize_entry(entry) -> dict:
     return data
 
 
-def _serialize_file(path: Path, meta, shifted: bool) -> dict:
-    """Match _metadata_to_file_entry from server.py, plus a shifted flag."""
-    if isinstance(meta, PhotoMetadata):
-        return {
-            "path": str(path),
-            "type": "photo",
-            "timestamp": meta.timestamp.isoformat() if meta.timestamp else None,
-            "duration_seconds": None,
-            "has_timestamp": meta.timestamp is not None,
-            "shifted": shifted,
-        }
-    return {
-        "path": str(path),
-        "type": "video",
-        "timestamp": (
-            meta.start_timestamp.isoformat() if meta.start_timestamp else None
-        ),
-        "duration_seconds": meta.duration_seconds,
-        "has_timestamp": meta.start_timestamp is not None,
-        "shifted": shifted,
-    }
-
-
 def build_preview(
     pairs: list[MediaInput],
     offsets: list[OffsetEntry],
@@ -127,7 +105,7 @@ def build_preview(
     timeline = build_timeline(shifted_pairs)
     entries = [_serialize_entry(e) for e in timeline.all_entries]
     files = [
-        _serialize_file(p, m, str(p) in shifted_paths)
+        metadata_to_file_entry(p, m, shifted=str(p) in shifted_paths)
         for p, m in sorted(shifted_pairs, key=lambda pm: str(pm[0]))
     ]
     return {
