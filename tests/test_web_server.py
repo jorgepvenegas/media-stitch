@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from photowalk.models import PhotoMetadata
 from photowalk.timeline import TimelineMap, TimelineEntry
 from photowalk.web.server import create_app
 
@@ -91,3 +92,12 @@ def test_assets_serve_css_and_js():
     js = client.get("/assets/app.js")
     assert js.status_code == 200
     assert "javascript" in js.headers["content-type"]
+
+
+def test_app_state_holds_metadata_pairs():
+    img = Path("/tmp/photo.jpg")
+    meta = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0))
+    timeline = TimelineMap()
+    app = create_app({img}, timeline, metadata_pairs=[(img, meta)])
+    assert app.state.metadata_pairs == [(img, meta)]
+    assert app.state.image_duration == 3.5

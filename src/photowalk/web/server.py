@@ -39,6 +39,7 @@ def create_app(
     image_duration: float = 3.5,
     *,
     file_list: "list[dict] | None" = None,
+    metadata_pairs: "list[tuple[Path, object]] | None" = None,
 ) -> FastAPI:
     """Create the FastAPI application.
 
@@ -50,8 +51,13 @@ def create_app(
             as /api/files response).  When provided, ``extract_metadata`` is
             NOT called again — callers that have already extracted metadata
             (e.g. ``build_app_from_path``) pass it here to avoid double I/O.
+        metadata_pairs: Optional list of (Path, metadata) tuples for use by
+            endpoints like preview/apply that need the original metadata objects.
     """
     app = FastAPI()
+    app.state.metadata_pairs = metadata_pairs or []
+    app.state.image_duration = image_duration
+    app.state.scan_files = scan_files
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -138,6 +144,8 @@ def build_app_from_path(
         prebuilt_file_list.append(_metadata_to_file_entry(f, meta))
 
     timeline = build_timeline(pairs)
-    app = create_app(scan_files, timeline, image_duration, file_list=prebuilt_file_list)
+    app = create_app(
+        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs
+    )
     app.state.media_count = len(files)
     return app
