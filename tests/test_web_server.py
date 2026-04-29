@@ -80,3 +80,14 @@ def test_media_rejects_nonexistent_file(tmp_path):
     client = TestClient(app)
     response = client.get(f"/media/{file_path}")
     assert response.status_code == 404
+
+
+def test_assets_serve_css_and_js():
+    app = create_app(set(), TimelineMap())
+    client = TestClient(app)
+    css = client.get("/assets/style.css")
+    assert css.status_code == 200
+    assert "text/css" in css.headers["content-type"]
+    js = client.get("/assets/app.js")
+    assert js.status_code == 200
+    assert "javascript" in js.headers["content-type"]

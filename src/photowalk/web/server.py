@@ -58,6 +58,15 @@ def create_app(
         html = _load_asset("index.html")
         return HTMLResponse(content=html)
 
+    @app.get("/assets/{filename}")
+    async def asset(filename: str):
+        allowed = {"style.css", "app.js", "index.html"}
+        if filename not in allowed:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        content = _load_asset(filename)
+        media_type = "text/css" if filename.endswith(".css") else "application/javascript" if filename.endswith(".js") else "text/html"
+        return HTMLResponse(content=content, media_type=media_type)
+
     @app.get("/api/timeline")
     async def api_timeline():
         entries = []
