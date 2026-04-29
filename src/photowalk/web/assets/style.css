@@ -310,6 +310,14 @@ body {
   flex-direction: column;
   gap: 2px;
 }
+.details-section .sub-header {
+  font-size: 0.75rem;
+  color: #888;
+  margin-bottom: 4px;
+}
+.details-section .sub-header.source {
+  margin: 8px 0 4px;
+}
 .details-shift .original {
   color: #888;
   text-decoration: line-through;

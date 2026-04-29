@@ -348,13 +348,34 @@
   `;
     body.appendChild(fileSection);
 
+    const shiftedFile = getShiftedFile(path);
+    const isShifted = shiftedFile !== null;
+
+    function tsCell(originalIso, shiftedIso) {
+      if (!originalIso && !shiftedIso) return dash;
+      if (!isShifted || !shiftedIso || originalIso === shiftedIso) {
+        return `<span class="value">${escapeHtml(formatDateTime(shiftedIso || originalIso))}</span>`;
+      }
+      return `
+        <span class="value details-shift">
+          <span class="original">${escapeHtml(formatDateTime(originalIso))}</span>
+          <span class="arrow">→</span>
+          <span class="shifted">${escapeHtml(formatDateTime(shiftedIso))}</span>
+        </span>
+      `;
+    }
+
     const tsSection = document.createElement('div');
     tsSection.className = 'details-section';
 
     const dash = '<span class="value" style="color:#666;">—</span>';
     const isSegmentClick = source === 'timeline' && entry.kind === 'video_segment';
 
-    let html = '<h4>Timestamps</h4>';
+    const badge = isShifted
+      ? '<span class="shifted-badge">Pending sync</span>'
+      : '';
+
+    let html = `<h4>Timestamps ${badge}</h4>`;
 
     if (isSegmentClick) {
       const segStart = entry.start_time
@@ -370,31 +391,25 @@
         ? `<span class="value">${entry.trim_end.toFixed(2)}s</span>`
         : dash;
 
-      html += '<div style="font-size:0.75rem;color:#888;margin-bottom:4px;">This segment</div>';
+      html += '<div class="sub-header">This segment</div>';
       html += `<div class="details-row"><span class="label">Start on timeline</span>${segStart}</div>`;
       html += `<div class="details-row"><span class="label">Trim start</span>${trimStart}</div>`;
       html += `<div class="details-row"><span class="label">Trim end</span>${trimEnd}</div>`;
       html += `<div class="details-row"><span class="label">Segment duration</span>${segDur}</div>`;
-      html += '<div style="font-size:0.75rem;color:#888;margin:8px 0 4px;">Source video</div>';
+      html += '<div class="sub-header source">Source video</div>';
     }
 
     if (file.type === 'photo') {
-      const captured = file.timestamp
-        ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
-        : dash;
-      html += `<div class="details-row"><span class="label">Captured</span>${captured}</div>`;
+      const shiftedTs = shiftedFile ? shiftedFile.timestamp : null;
+      html += `<div class="details-row"><span class="label">Captured</span>${tsCell(file.timestamp, shiftedTs)}</div>`;
     } else {
-      const start = file.timestamp
-        ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
-        : dash;
-      const end = file.end_timestamp
-        ? `<span class="value">${escapeHtml(formatDateTime(file.end_timestamp))}</span>`
-        : dash;
+      const shiftedStart = shiftedFile ? shiftedFile.timestamp : null;
+      const shiftedEnd = shiftedFile ? shiftedFile.end_timestamp : null;
       const dur = file.duration_seconds != null
         ? `<span class="value">${file.duration_seconds.toFixed(2)}s</span>`
         : dash;
-      html += `<div class="details-row"><span class="label">Start</span>${start}</div>`;
-      html += `<div class="details-row"><span class="label">End</span>${end}</div>`;
+      html += `<div class="details-row"><span class="label">Start</span>${tsCell(file.timestamp, shiftedStart)}</div>`;
+      html += `<div class="details-row"><span class="label">End</span>${tsCell(file.end_timestamp, shiftedEnd)}</div>`;
       html += `<div class="details-row"><span class="label">Duration</span>${dur}</div>`;
     }
 
@@ -405,6 +420,11 @@
   function clearDetails() {
     const body = document.getElementById('details-panel-body');
     body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+  }
+
+  function getShiftedFile(path) {
+    if (!previewIsCurrent) return null;
+    return lastPreviewFiles.find(f => f.path === path && f.shifted) || null;
   }
 
   function formatDateTime(iso) {
