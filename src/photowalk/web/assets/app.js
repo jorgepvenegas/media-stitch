@@ -46,78 +46,109 @@
     });
   }
 
+  function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
   function renderTimeline(entries, imageDuration) {
     const svg = document.getElementById('timeline-svg');
     const scroll = document.getElementById('timeline-scroll');
 
-    const times = entries.map(e => new Date(e.start_time).getTime());
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times.map((t, i) => {
-      const dur = entries[i].kind === 'image' ? imageDuration : entries[i].duration_seconds;
-      return t + dur * 1000;
-    }));
-    const totalMs = maxTime - minTime;
-    const totalSeconds = totalMs / 1000;
-
     const barHeight = 40;
     const padding = 20;
+    const gap = 4; // visual gap between consecutive entries
     const svgHeight = barHeight + padding * 2;
     const scale = 50; // pixels per second
-    const svgWidth = Math.max(scroll.clientWidth, totalSeconds * scale + padding * 2);
 
+    // Sort entries by start_time to ensure correct visual order
+    const sorted = [...entries].sort((a, b) =>
+      new Date(a.start_time) - new Date(b.start_time)
+    );
+
+    // Build compressed positions — dead time between entries is removed
+    let currentX = padding;
+    const positions = sorted.map(entry => {
+      const effectiveDuration = entry.kind === 'image' ? imageDuration : entry.duration_seconds;
+      const width = Math.max(2, effectiveDuration * scale);
+      const x = currentX;
+      currentX += width + gap;
+      return { entry, x, width, effectiveDuration };
+    });
+
+    const svgWidth = Math.max(scroll.clientWidth, currentX + padding);
     svg.setAttribute('width', svgWidth);
     svg.setAttribute('height', svgHeight);
     svg.innerHTML = '';
 
-    entries.forEach((entry, i) => {
-      const startMs = new Date(entry.start_time).getTime() - minTime;
-      const x = padding + (startMs / 1000) * scale;
-      const effectiveDuration = entry.kind === 'image' ? imageDuration : entry.duration_seconds;
-      const w = Math.max(2, effectiveDuration * scale);
+    positions.forEach(({ entry, x, width }) => {
       const y = padding;
 
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('x', x);
       rect.setAttribute('y', y);
-      rect.setAttribute('width', w);
+      rect.setAttribute('width', width);
       rect.setAttribute('height', barHeight);
       rect.setAttribute('rx', 3);
-      rect.classList.baseVal = `timeline-bar ${entry.kind === 'image' ? 'image' : 'video'}`;
+      rect.setAttribute('class', `timeline-bar ${entry.kind === 'image' ? 'image' : 'video'}`);
       rect.dataset.path = entry.source_path;
       rect.dataset.kind = entry.kind === 'image' ? 'photo' : 'video';
+      if (entry.kind === 'video_segment') {
+        rect.dataset.trimStart = entry.trim_start;
+        rect.dataset.trimEnd = entry.trim_end;
+      }
       rect.addEventListener('click', () => selectFile(entry.source_path, rect.dataset.kind, rect));
       svg.appendChild(rect);
 
-      if (w > 40) {
+      if (width > 40) {
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         label.setAttribute('x', x + 4);
         label.setAttribute('y', y + barHeight / 2);
-        label.classList.baseVal = 'timeline-label';
-        const name = entry.source_path.split('/').pop();
-        label.textContent = name.length > 20 ? name.slice(0, 18) + '…' : name;
+        label.setAttribute('class', 'timeline-label');
+        let name = entry.source_path.split('/').pop();
+        if (entry.kind === 'video_segment' && entry.trim_start != null && entry.trim_end != null) {
+          name = `${name} [${formatTime(entry.trim_start)}–${formatTime(entry.trim_end)}]`;
+        }
+        label.textContent = name.length > 30 ? name.slice(0, 28) + '…' : name;
         svg.appendChild(label);
       }
     });
 
-    renderAxis(minTime, maxTime, scale, padding);
+    renderAxis(positions, scale, padding, gap);
   }
 
-  function renderAxis(minTime, maxTime, scale, padding) {
+  function renderAxis(positions, scale, padding, gap) {
     const axis = document.getElementById('timeline-axis');
     axis.innerHTML = '';
-    const totalSeconds = (maxTime - minTime) / 1000;
+    if (positions.length === 0) return;
+
+    const totalOutputSeconds = positions.reduce((sum, p) => sum + p.effectiveDuration, 0);
     const containerWidth = axis.clientWidth;
-    const tickInterval = totalSeconds > 600 ? 60 : (totalSeconds > 120 ? 30 : 10);
-    const numTicks = Math.floor(totalSeconds / tickInterval);
+    const tickInterval = totalOutputSeconds > 600 ? 60 : (totalOutputSeconds > 120 ? 30 : 10);
+    const numTicks = Math.floor(totalOutputSeconds / tickInterval);
 
     for (let i = 0; i <= numTicks; i++) {
       const sec = i * tickInterval;
-      const left = padding + sec * scale;
-      if (left > containerWidth) break;
+
+      // Map cumulative output time back to compressed x coordinate
+      let accumulated = 0;
+      let x = padding;
+      for (const p of positions) {
+        if (accumulated + p.effectiveDuration >= sec) {
+          const intoBlock = sec - accumulated;
+          x = p.x + intoBlock * scale;
+          break;
+        }
+        accumulated += p.effectiveDuration;
+        x = p.x + p.width + gap;
+      }
+
+      if (x > containerWidth) break;
 
       const tick = document.createElement('div');
       tick.style.position = 'absolute';
-      tick.style.left = left + 'px';
+      tick.style.left = x + 'px';
       tick.style.top = '0';
       tick.style.fontSize = '11px';
       tick.style.color = '#888';
@@ -126,8 +157,9 @@
       tick.style.height = '100%';
       tick.style.whiteSpace = 'nowrap';
 
-      const date = new Date(minTime + sec * 1000);
-      tick.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const minutes = Math.floor(sec / 60);
+      const seconds = Math.floor(sec % 60);
+      tick.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
       axis.appendChild(tick);
     }
   }
@@ -152,16 +184,24 @@
     placeholder.style.display = 'none';
 
     if (type === 'video') {
-      video.src = '/media/' + path;
+      let src = '/media/' + path;
+      const trimStart = el.dataset.trimStart;
+      const trimEnd = el.dataset.trimEnd;
+      if (trimStart !== undefined && trimEnd !== undefined) {
+        src += '#t=' + parseFloat(trimStart) + ',' + parseFloat(trimEnd);
+      }
+      video.src = src;
       video.style.display = 'block';
       img.style.display = 'none';
       video.load();
+      video.onloadedmetadata = null;
     } else {
       img.src = '/media/' + path;
       img.style.display = 'block';
       video.style.display = 'none';
       video.pause();
       video.src = '';
+      video.onloadedmetadata = null;
     }
   }
 })();
