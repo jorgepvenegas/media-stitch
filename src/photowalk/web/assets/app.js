@@ -352,15 +352,38 @@
     tsSection.className = 'details-section';
 
     const dash = '<span class="value" style="color:#666;">—</span>';
-    let rows = '';
+    const isSegmentClick = source === 'timeline' && entry.kind === 'video_segment';
+
+    let html = '<h4>Timestamps</h4>';
+
+    if (isSegmentClick) {
+      const segStart = entry.start_time
+        ? `<span class="value">${escapeHtml(formatDateTime(entry.start_time))}</span>`
+        : dash;
+      const segDur = entry.duration_seconds != null
+        ? `<span class="value">${entry.duration_seconds.toFixed(2)}s</span>`
+        : dash;
+      const trimStart = entry.trim_start != null
+        ? `<span class="value">${entry.trim_start.toFixed(2)}s</span>`
+        : dash;
+      const trimEnd = entry.trim_end != null
+        ? `<span class="value">${entry.trim_end.toFixed(2)}s</span>`
+        : dash;
+
+      html += '<div style="font-size:0.75rem;color:#888;margin-bottom:4px;">This segment</div>';
+      html += `<div class="details-row"><span class="label">Start on timeline</span>${segStart}</div>`;
+      html += `<div class="details-row"><span class="label">Trim start</span>${trimStart}</div>`;
+      html += `<div class="details-row"><span class="label">Trim end</span>${trimEnd}</div>`;
+      html += `<div class="details-row"><span class="label">Segment duration</span>${segDur}</div>`;
+      html += '<div style="font-size:0.75rem;color:#888;margin:8px 0 4px;">Source video</div>';
+    }
 
     if (file.type === 'photo') {
       const captured = file.timestamp
         ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
         : dash;
-      rows += `<div class="details-row"><span class="label">Captured</span>${captured}</div>`;
+      html += `<div class="details-row"><span class="label">Captured</span>${captured}</div>`;
     } else {
-      // video
       const start = file.timestamp
         ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
         : dash;
@@ -370,12 +393,12 @@
       const dur = file.duration_seconds != null
         ? `<span class="value">${file.duration_seconds.toFixed(2)}s</span>`
         : dash;
-      rows += `<div class="details-row"><span class="label">Start</span>${start}</div>`;
-      rows += `<div class="details-row"><span class="label">End</span>${end}</div>`;
-      rows += `<div class="details-row"><span class="label">Duration</span>${dur}</div>`;
+      html += `<div class="details-row"><span class="label">Start</span>${start}</div>`;
+      html += `<div class="details-row"><span class="label">End</span>${end}</div>`;
+      html += `<div class="details-row"><span class="label">Duration</span>${dur}</div>`;
     }
 
-    tsSection.innerHTML = `<h4>Timestamps</h4>${rows}`;
+    tsSection.innerHTML = html;
     body.appendChild(tsSection);
   }
 
