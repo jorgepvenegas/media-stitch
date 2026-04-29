@@ -351,6 +351,8 @@
     const shiftedFile = getShiftedFile(path);
     const isShifted = shiftedFile !== null;
 
+    const dash = '<span class="value" style="color:#666;">—</span>';
+
     function tsCell(originalIso, shiftedIso) {
       if (!originalIso && !shiftedIso) return dash;
       if (!isShifted || !shiftedIso || originalIso === shiftedIso) {
@@ -368,7 +370,6 @@
     const tsSection = document.createElement('div');
     tsSection.className = 'details-section';
 
-    const dash = '<span class="value" style="color:#666;">—</span>';
     const isSegmentClick = source === 'timeline' && entry.kind === 'video_segment';
 
     const badge = isShifted
