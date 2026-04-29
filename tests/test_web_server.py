@@ -101,3 +101,38 @@ def test_app_state_holds_metadata_pairs():
     app = create_app({img}, timeline, metadata_pairs=[(img, meta)])
     assert app.state.metadata_pairs == [(img, meta)]
     assert app.state.image_duration == 3.5
+
+
+def test_api_files_includes_camera_fields_for_photos(tmp_path):
+    img = Path("/tmp/photo.jpg")
+    meta = PhotoMetadata(
+        source_path=img,
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        camera_model="Canon EOS R6",
+        shutter_speed="1/250",
+        iso=400,
+        focal_length="35mm",
+    )
+    timeline = TimelineMap()
+    file_entry = {
+        "path": str(img),
+        "type": "photo",
+        "timestamp": "2024-01-01T12:00:00",
+        "duration_seconds": None,
+        "has_timestamp": True,
+        "shifted": False,
+        "camera_model": "Canon EOS R6",
+        "shutter_speed": "1/250",
+        "iso": 400,
+        "focal_length": "35mm",
+    }
+    app = create_app(
+        {img}, timeline, metadata_pairs=[(img, meta)], file_list=[file_entry]
+    )
+    client = TestClient(app)
+    response = client.get("/api/files")
+    files = response.json()["files"]
+    assert files[0]["camera_model"] == "Canon EOS R6"
+    assert files[0]["shutter_speed"] == "1/250"
+    assert files[0]["iso"] == 400
+    assert files[0]["focal_length"] == "35mm"

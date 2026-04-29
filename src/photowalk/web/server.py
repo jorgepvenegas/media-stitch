@@ -8,6 +8,7 @@ from photowalk.api import extract_metadata
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.offset import parse_duration, parse_reference, OffsetError
+from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.web.sync_apply import apply_offsets
 from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
 from photowalk.web.sync_preview import build_preview
@@ -17,26 +18,6 @@ from photowalk.writers import write_photo_timestamp, write_video_timestamp
 def _load_asset(filename: str) -> str:
     asset_dir = Path(__file__).parent / "assets"
     return (asset_dir / filename).read_text()
-
-
-def _metadata_to_file_entry(path: Path, meta: "PhotoMetadata | VideoMetadata") -> dict:
-    """Convert a metadata object to the dict shape returned by /api/files."""
-    if isinstance(meta, PhotoMetadata):
-        return {
-            "path": str(path),
-            "type": "photo",
-            "timestamp": meta.timestamp.isoformat() if meta.timestamp else None,
-            "duration_seconds": None,
-            "has_timestamp": meta.timestamp is not None,
-        }
-    # VideoMetadata
-    return {
-        "path": str(path),
-        "type": "video",
-        "timestamp": meta.start_timestamp.isoformat() if meta.start_timestamp else None,
-        "duration_seconds": meta.duration_seconds,
-        "has_timestamp": meta.start_timestamp is not None,
-    }
 
 
 def create_app(
@@ -91,7 +72,7 @@ def create_app(
             _meta = extract_metadata(_path)
             if _meta is None:
                 continue
-            _file_list.append(_metadata_to_file_entry(_path, _meta))
+            _file_list.append(metadata_to_file_entry(_path, _meta))
         app.state.file_list = _file_list
 
     @app.get("/", response_class=HTMLResponse)
@@ -200,7 +181,7 @@ def build_app_from_path(
         if meta is None:
             continue
         pairs.append((f, meta))
-        prebuilt_file_list.append(_metadata_to_file_entry(f, meta))
+        prebuilt_file_list.append(metadata_to_file_entry(f, meta))
 
     timeline = build_timeline(pairs)
     app = create_app(

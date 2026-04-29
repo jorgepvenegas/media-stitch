@@ -127,10 +127,11 @@ photowalk web ~/Photos/ --recursive
 photowalk web ~/Photos/2024/ --image-duration 5.0
 ```
 
-Opens a browser UI with three panels:
+Opens a browser UI with four panels:
 - **Preview player** (top) — click any timeline item to preview the source video/image
 - **Source files** (left sidebar) — all scanned files sorted chronologically
-- **Timeline** (right) — single-lane SVG showing video segments and images in order
+- **Timeline** (center) — single-lane SVG showing video segments and images in order
+- **Details** (right) — click any source file or timeline item to inspect timestamps, EXIF (photos), and segment trim info (video segments). When a sync preview is pending, timestamps render as `original → shifted`.
 
 #### Sync timestamps from the UI
 

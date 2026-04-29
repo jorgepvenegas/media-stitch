@@ -5,7 +5,7 @@
   let allFiles = [];                // most recent files response
   let lastPreviewFiles = [];        // files from last preview, for diff modal
   let previewIsCurrent = false;     // false if stack changed since last preview
-  let originalTimestamps = {};      // path -> ISO string at app load (or after apply)
+  let originalFilesByPath = {};       // path -> full file record at app load (or after apply)
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -16,7 +16,8 @@
   const filesData = await filesRes.json();
 
   allFiles = filesData.files;
-  allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
+  originalFilesByPath = {};
+  allFiles.forEach(f => { originalFilesByPath[f.path] = f; });
   renderSidebar(allFiles);
   renderTimelineFromData(timelineData);
 
@@ -80,7 +81,10 @@
 
       block.appendChild(filenameDiv);
       block.appendChild(metaDiv);
-      block.addEventListener('click', () => selectFile(f.path, f.type, el));
+      block.addEventListener('click', () => {
+        selectFile(f.path, f.type, el);
+        renderDetails('sidebar', f);
+      });
       el.appendChild(block);
 
       container.appendChild(el);
@@ -121,6 +125,7 @@
       selection.clear();
       renderSidebar(allFiles);
       updateButtons();
+      clearDetails();
     });
 
     document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
@@ -221,7 +226,10 @@
         rect.dataset.trimStart = entry.trim_start;
         rect.dataset.trimEnd = entry.trim_end;
       }
-      rect.addEventListener('click', () => selectFile(entry.source_path, rect.dataset.kind, rect));
+      rect.addEventListener('click', () => {
+        selectFile(entry.source_path, rect.dataset.kind, rect);
+        renderDetails('timeline', entry);
+      });
       svg.appendChild(rect);
 
       if (width > 40) {
@@ -314,6 +322,146 @@
       row.appendChild(remove);
       container.appendChild(row);
     });
+  }
+
+  function renderDetails(source, entry) {
+    const body = document.getElementById('details-panel-body');
+    body.innerHTML = '';
+
+    // Resolve the file path from either a sidebar file record or a timeline entry.
+    const path = entry.path || entry.source_path;
+    const file = originalFilesByPath[path];
+    if (!file) {
+      body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+      return;
+    }
+
+    const filename = path.split('/').pop();
+
+    const fileSection = document.createElement('div');
+    fileSection.className = 'details-section';
+    fileSection.innerHTML = `
+    <h4>File</h4>
+    <div class="details-row"><span class="label">Name</span><span class="value"><strong>${escapeHtml(filename)}</strong></span></div>
+    <div class="details-row"><span class="label">Type</span><span class="value">${escapeHtml(file.type)}</span></div>
+    <div class="details-row path"><span class="label">Path</span><span class="value">${escapeHtml(path)}</span></div>
+  `;
+    body.appendChild(fileSection);
+
+    const shiftedFile = getShiftedFile(path);
+    const isShifted = shiftedFile !== null;
+
+    const dash = '<span class="value" style="color:#666;">—</span>';
+
+    function tsCell(originalIso, shiftedIso) {
+      if (!originalIso && !shiftedIso) return dash;
+      if (!isShifted || !shiftedIso || originalIso === shiftedIso) {
+        return `<span class="value">${escapeHtml(formatDateTime(shiftedIso || originalIso))}</span>`;
+      }
+      return `
+        <span class="value details-shift">
+          <span class="original">${escapeHtml(formatDateTime(originalIso))}</span>
+          <span class="arrow">→</span>
+          <span class="shifted">${escapeHtml(formatDateTime(shiftedIso))}</span>
+        </span>
+      `;
+    }
+
+    const tsSection = document.createElement('div');
+    tsSection.className = 'details-section';
+
+    const isSegmentClick = source === 'timeline' && entry.kind === 'video_segment';
+
+    const badge = isShifted
+      ? '<span class="shifted-badge">Pending sync</span>'
+      : '';
+
+    let html = `<h4>Timestamps ${badge}</h4>`;
+
+    if (isSegmentClick) {
+      const segStart = entry.start_time
+        ? `<span class="value">${escapeHtml(formatDateTime(entry.start_time))}</span>`
+        : dash;
+      const segDur = entry.duration_seconds != null
+        ? `<span class="value">${entry.duration_seconds.toFixed(2)}s</span>`
+        : dash;
+      const trimStart = entry.trim_start != null
+        ? `<span class="value">${entry.trim_start.toFixed(2)}s</span>`
+        : dash;
+      const trimEnd = entry.trim_end != null
+        ? `<span class="value">${entry.trim_end.toFixed(2)}s</span>`
+        : dash;
+
+      html += '<div class="sub-header">This segment</div>';
+      html += `<div class="details-row"><span class="label">Start on timeline</span>${segStart}</div>`;
+      html += `<div class="details-row"><span class="label">Trim start</span>${trimStart}</div>`;
+      html += `<div class="details-row"><span class="label">Trim end</span>${trimEnd}</div>`;
+      html += `<div class="details-row"><span class="label">Segment duration</span>${segDur}</div>`;
+      html += '<div class="sub-header source">Source video</div>';
+    }
+
+    if (file.type === 'photo') {
+      const shiftedTs = shiftedFile ? shiftedFile.timestamp : null;
+      html += `<div class="details-row"><span class="label">Captured</span>${tsCell(file.timestamp, shiftedTs)}</div>`;
+    } else {
+      const shiftedStart = shiftedFile ? shiftedFile.timestamp : null;
+      const shiftedEnd = shiftedFile ? shiftedFile.end_timestamp : null;
+      const dur = file.duration_seconds != null
+        ? `<span class="value">${file.duration_seconds.toFixed(2)}s</span>`
+        : dash;
+      html += `<div class="details-row"><span class="label">Start</span>${tsCell(file.timestamp, shiftedStart)}</div>`;
+      html += `<div class="details-row"><span class="label">End</span>${tsCell(file.end_timestamp, shiftedEnd)}</div>`;
+      html += `<div class="details-row"><span class="label">Duration</span>${dur}</div>`;
+    }
+
+    tsSection.innerHTML = html;
+    body.appendChild(tsSection);
+
+    if (file.type === 'photo') {
+      const fields = [
+        ['Camera', file.camera_model],
+        ['Shutter', file.shutter_speed],
+        ['ISO', file.iso != null ? String(file.iso) : null],
+        ['Focal length', file.focal_length],
+      ];
+      const hasAny = fields.some(([, v]) => v != null && v !== '');
+      if (hasAny) {
+        const camSection = document.createElement('div');
+        camSection.className = 'details-section';
+        let camHtml = '<h4>Camera</h4>';
+        for (const [label, value] of fields) {
+          const cell = (value != null && value !== '')
+            ? `<span class="value">${escapeHtml(value)}</span>`
+            : dash;
+          camHtml += `<div class="details-row"><span class="label">${label}</span>${cell}</div>`;
+        }
+        camSection.innerHTML = camHtml;
+        body.appendChild(camSection);
+      }
+    }
+  }
+
+  function clearDetails() {
+    const body = document.getElementById('details-panel-body');
+    body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+  }
+
+  function getShiftedFile(path) {
+    if (!previewIsCurrent) return null;
+    return lastPreviewFiles.find(f => f.path === path && f.shifted) || null;
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
   async function addToQueue() {
@@ -410,7 +558,8 @@
 
     shiftedFiles.forEach(f => {
       const row = document.createElement('div');
-      const oldTs = originalTimestamps[f.path] || '(none)';
+      const oldRec = originalFilesByPath[f.path];
+      const oldTs = (oldRec && oldRec.timestamp) || '(none)';
       row.textContent = `${f.path.split('/').pop()}  ${oldTs}  →  ${f.timestamp}`;
       diffEl.appendChild(row);
     });
@@ -439,8 +588,8 @@
 
     allFiles = res.files;
     lastPreviewFiles = res.files;
-    originalTimestamps = {};
-    allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
+    originalFilesByPath = {};
+    allFiles.forEach(f => { originalFilesByPath[f.path] = f; });
 
     pendingStack.length = 0;
     selection.clear();
@@ -448,6 +597,7 @@
     renderQueue();
     renderSidebar(allFiles);
     renderTimelineFromData(res.timeline);
+    clearDetails();
     updateButtons();
     closeApplyModal();
 

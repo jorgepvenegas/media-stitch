@@ -30,7 +30,8 @@ src/photowalk/
 │   ├── sync_models.py     # Pydantic request models for sync endpoints
 │   ├── sync_preview.py    # Pure helpers: compute_net_deltas, shift_pairs, build_preview
 │   ├── sync_apply.py      # apply_offsets orchestrator (delegates to writers)
-│   └── assets/            # Embedded SPA (index.html, style.css, app.js)
+│   ├── file_entry.py      # Single source of truth for /api/files, preview, apply per-file dict shape
+│   └── assets/            # Embedded SPA (index.html, style.css, app.js — details panel via renderDetails)
 ├── models.py            # PhotoMetadata, VideoMetadata dataclasses with to_dict()
 ├── constants.py         # PHOTO_EXTENSIONS, VIDEO_EXTENSIONS sets
 ├── photo_extractors.py  # Pillow-based EXIF reading
