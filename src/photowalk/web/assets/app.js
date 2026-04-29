@@ -432,8 +432,8 @@
         for (const [label, value] of fields) {
           const cell = (value != null && value !== '')
             ? `<span class="value">${escapeHtml(value)}</span>`
-            : '<span class="value" style="color:#666;">—</span>';
-          camHtml += `<div class="details-row"><span class="label">${escapeHtml(label)}</span>${cell}</div>`;
+            : dash;
+          camHtml += `<div class="details-row"><span class="label">${label}</span>${cell}</div>`;
         }
         camSection.innerHTML = camHtml;
         body.appendChild(camSection);
