@@ -140,7 +140,11 @@
     document.querySelectorAll('.sidebar-item.selected').forEach(e => e.classList.remove('selected'));
     document.querySelectorAll('.timeline-bar.selected').forEach(e => e.classList.remove('selected'));
     el.classList.add('selected');
-    document.querySelectorAll(`.timeline-bar[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
+    if (el.classList.contains('sidebar-item')) {
+      document.querySelectorAll(`.timeline-bar[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
+    } else {
+      document.querySelectorAll(`.sidebar-item[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
+    }
 
     const video = document.getElementById('preview-video');
     const img = document.getElementById('preview-image');
@@ -215,12 +219,7 @@
         rect.dataset.trimStart = entry.trim_start;
         rect.dataset.trimEnd = entry.trim_end;
       }
-      rect.addEventListener('click', () => {
-        document.querySelectorAll('.sidebar-item.selected').forEach(e => e.classList.remove('selected'));
-        document.querySelectorAll('.timeline-bar.selected').forEach(e => e.classList.remove('selected'));
-        rect.classList.add('selected');
-        document.querySelectorAll(`.sidebar-item[data-path="${CSS.escape(entry.source_path)}"]`).forEach(b => b.classList.add('selected'));
-      });
+      rect.addEventListener('click', () => selectFile(entry.source_path, rect.dataset.kind, rect));
       svg.appendChild(rect);
 
       if (width > 40) {
