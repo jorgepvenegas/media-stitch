@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from pathlib import Path
 from typing import Set
 
@@ -204,7 +205,6 @@ def create_app(
 
     @app.post("/api/open-folder")
     async def api_open_folder(body: dict):
-        import sys
         path = Path(body.get("path", ""))
         if not path.exists():
             raise HTTPException(status_code=400, detail="Path does not exist")

@@ -1,9 +1,17 @@
-import pytest
-from pydantic import ValidationError
-from fastapi.testclient import TestClient
+import asyncio
+import threading
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
 
-from photowalk.web.stitch_models import StitchRequest, StitchStatus
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+
+from photowalk.timeline import TimelineMap, TimelineEntry
 from photowalk.web.server import create_app
+from photowalk.web.stitch_models import StitchRequest, StitchStatus
+from photowalk.web.stitch_runner import StitchJob, start_stitch, cancel_stitch
 
 
 def test_stitch_request_valid():
@@ -33,17 +41,6 @@ def test_stitch_status_serialization():
     d = status.model_dump()
     assert d["state"] == "running"
     assert d["message"] == "Stitching..."
-
-
-import asyncio
-import threading
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-from photowalk.timeline import TimelineMap, TimelineEntry
-from photowalk.web.stitch_models import StitchRequest
-from photowalk.web.stitch_runner import StitchJob, start_stitch, cancel_stitch
 
 
 def _make_timeline():
@@ -212,7 +209,7 @@ def test_api_stitch_cancel():
         client.post("/api/stitch", json={"output": "/tmp/out.mp4"})
         r = client.post("/api/stitch/cancel")
         assert r.status_code == 200
-        assert r.json()["state"] in ("cancelled", "running")
+        assert r.json()["state"] == "cancelled"
 
 
 def test_api_open_folder():

@@ -9,8 +9,6 @@ class StitchRequest(BaseModel):
     draft: bool = False
     image_duration: float = 3.5
     margin: float = 15.0
-    open_folder: bool = False
-
     @field_validator("format")
     @classmethod
     def validate_format(cls, v: str | None) -> str | None:
