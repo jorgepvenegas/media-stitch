@@ -1,5 +1,7 @@
 """Shared ffmpeg encoding configuration and helpers."""
 
+import subprocess
+import threading
 from dataclasses import dataclass
 
 
@@ -23,6 +25,34 @@ class FfmpegEncodeConfig:
 def ffmpeg_not_found_error() -> str:
     """Return a standard error message for missing ffmpeg/ffprobe."""
     return "ffmpeg not found in PATH. Install FFmpeg: https://ffmpeg.org"
+
+
+def _run_ffmpeg_cmd(cmd: list[str], cancel_event: threading.Event | None = None) -> bool:
+    """Run an ffmpeg command with optional cancellation via threading.Event.
+
+    Returns True if the command exits with code 0, False otherwise.
+    Raises RuntimeError if ffmpeg is not found.
+    """
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except FileNotFoundError:
+        raise RuntimeError(ffmpeg_not_found_error())
+
+    while True:
+        try:
+            proc.wait(timeout=0.5)
+            break
+        except subprocess.TimeoutExpired:
+            if cancel_event is not None and cancel_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+                return False
+
+    return proc.returncode == 0
 
 
 def build_scale_pad_filter(
