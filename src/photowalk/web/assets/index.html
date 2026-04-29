@@ -42,6 +42,7 @@
         <button id="btn-update-timeline" type="button" disabled>Update timeline</button>
         <button id="btn-clear-queue" type="button" disabled>Clear queue</button>
         <button id="btn-apply" type="button" disabled>Apply</button>
+        <button id="btn-render" type="button">Render</button>
       </div>
     </div>
 
@@ -77,6 +78,50 @@
     </div>
   </div>
 
+  <div id="render-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div id="render-form">
+        <h3>Render Video</h3>
+        <p class="render-confirm-text">
+          This will generate a stitched video from the current timeline.
+          The process may take several minutes.
+        </p>
+        <div class="render-field">
+          <label>Output path</label>
+          <input type="text" id="render-output" placeholder="/path/to/output.mp4">
+        </div>
+        <div class="render-field">
+          <label>Resolution (optional)</label>
+          <input type="text" id="render-format" placeholder="1920x1080">
+        </div>
+        <div class="render-field row">
+          <label>Draft quality</label>
+          <input type="checkbox" id="render-draft">
+        </div>
+        <div class="render-field">
+          <label>Image duration (seconds)</label>
+          <input type="number" id="render-image-duration" value="3.5" step="0.1" min="0.1">
+        </div>
+        <div class="render-field">
+          <label>Margin (%)</label>
+          <input type="number" id="render-margin" value="15" step="1" min="0">
+        </div>
+        <div class="render-field row">
+          <label>Open output folder when done</label>
+          <input type="checkbox" id="render-open-folder">
+        </div>
+        <div class="modal-actions">
+          <button id="btn-render-cancel" type="button">Cancel</button>
+          <button id="btn-render-start" type="button">Start Render</button>
+        </div>
+      </div>
+      <div id="render-progress" style="display:none;">
+        <div class="render-spinner"></div>
+        <p class="render-status">Stitching...</p>
+        <button id="btn-render-cancel-run" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
   <div id="toast" class="toast" style="display:none;"></div>
 
   <script src="/assets/app.js"></script>
