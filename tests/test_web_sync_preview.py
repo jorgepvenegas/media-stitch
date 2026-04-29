@@ -99,3 +99,38 @@ def test_shift_pairs_does_not_mutate_inputs():
     pairs = [original]
     shift_pairs(pairs, {"/a.jpg": 3600.0})
     assert pairs[0][1].timestamp == datetime(2024, 1, 1, 12, 0, 0)
+
+
+from photowalk.web.sync_preview import build_preview
+
+
+def test_build_preview_empty_stack_returns_unshifted():
+    pairs = [_photo("/a.jpg", datetime(2024, 1, 1, 12, 0, 0))]
+    result = build_preview(pairs, [], image_duration=3.5)
+    assert result["settings"]["image_duration"] == 3.5
+    assert len(result["entries"]) == 1
+    assert result["files"][0]["shifted"] is False
+    assert result["files"][0]["timestamp"] == "2024-01-01T12:00:00"
+
+
+def test_build_preview_with_offset_marks_shifted_file():
+    pairs = [
+        _photo("/a.jpg", datetime(2024, 1, 1, 12, 0, 0)),
+        _photo("/b.jpg", datetime(2024, 1, 1, 13, 0, 0)),
+    ]
+    offsets = [_entry(3600.0, ["/a.jpg"])]
+    result = build_preview(pairs, offsets, image_duration=3.5)
+    files_by_path = {f["path"]: f for f in result["files"]}
+    assert files_by_path["/a.jpg"]["shifted"] is True
+    assert files_by_path["/a.jpg"]["timestamp"] == "2024-01-01T13:00:00"
+    assert files_by_path["/b.jpg"]["shifted"] is False
+
+
+def test_build_preview_files_sorted_by_path():
+    pairs = [
+        _photo("/b.jpg", datetime(2024, 1, 1, 13, 0, 0)),
+        _photo("/a.jpg", datetime(2024, 1, 1, 12, 0, 0)),
+    ]
+    result = build_preview(pairs, [], image_duration=3.5)
+    paths = [f["path"] for f in result["files"]]
+    assert paths == ["/a.jpg", "/b.jpg"]

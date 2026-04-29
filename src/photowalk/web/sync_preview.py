@@ -5,7 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from photowalk.models import PhotoMetadata, VideoMetadata
-from photowalk.timeline import MediaInput
+from photowalk.timeline import MediaInput, build_timeline
 from photowalk.web.sync_models import OffsetEntry
 
 
@@ -72,3 +72,66 @@ def shift_pairs(
             new_pairs.append((path, meta))
 
     return new_pairs, shifted
+
+
+def _serialize_entry(entry) -> dict:
+    """Mirror the serialization in server.api_timeline."""
+    data = {
+        "kind": entry.kind,
+        "source_path": str(entry.source_path),
+        "start_time": entry.start_time.isoformat() if entry.start_time else None,
+        "duration_seconds": entry.duration_seconds,
+    }
+    if entry.kind == "video_segment":
+        data["trim_start"] = entry.trim_start
+        data["trim_end"] = entry.trim_end
+        data["original_video"] = (
+            str(entry.original_video) if entry.original_video else None
+        )
+    return data
+
+
+def _serialize_file(path: Path, meta, shifted: bool) -> dict:
+    """Match _metadata_to_file_entry from server.py, plus a shifted flag."""
+    if isinstance(meta, PhotoMetadata):
+        return {
+            "path": str(path),
+            "type": "photo",
+            "timestamp": meta.timestamp.isoformat() if meta.timestamp else None,
+            "duration_seconds": None,
+            "has_timestamp": meta.timestamp is not None,
+            "shifted": shifted,
+        }
+    return {
+        "path": str(path),
+        "type": "video",
+        "timestamp": (
+            meta.start_timestamp.isoformat() if meta.start_timestamp else None
+        ),
+        "duration_seconds": meta.duration_seconds,
+        "has_timestamp": meta.start_timestamp is not None,
+        "shifted": shifted,
+    }
+
+
+def build_preview(
+    pairs: list[MediaInput],
+    offsets: list[OffsetEntry],
+    *,
+    image_duration: float,
+) -> dict:
+    """Return the response shape for POST /api/timeline/preview."""
+    deltas = compute_net_deltas(offsets)
+    shifted_pairs, shifted_paths = shift_pairs(pairs, deltas)
+
+    timeline = build_timeline(shifted_pairs)
+    entries = [_serialize_entry(e) for e in timeline.all_entries]
+    files = [
+        _serialize_file(p, m, str(p) in shifted_paths)
+        for p, m in sorted(shifted_pairs, key=lambda pm: str(pm[0]))
+    ]
+    return {
+        "entries": entries,
+        "settings": {"image_duration": image_duration},
+        "files": files,
+    }
