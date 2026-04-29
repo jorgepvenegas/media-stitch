@@ -5,7 +5,7 @@
   let allFiles = [];                // most recent files response
   let lastPreviewFiles = [];        // files from last preview, for diff modal
   let previewIsCurrent = false;     // false if stack changed since last preview
-  let originalTimestamps = {};      // path -> ISO string at app load (or after apply)
+  let originalFilesByPath = {};       // path -> full file record at app load (or after apply)
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -16,7 +16,8 @@
   const filesData = await filesRes.json();
 
   allFiles = filesData.files;
-  allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
+  originalFilesByPath = {};
+  allFiles.forEach(f => { originalFilesByPath[f.path] = f; });
   renderSidebar(allFiles);
   renderTimelineFromData(timelineData);
 
@@ -80,7 +81,10 @@
 
       block.appendChild(filenameDiv);
       block.appendChild(metaDiv);
-      block.addEventListener('click', () => selectFile(f.path, f.type, el));
+      block.addEventListener('click', () => {
+        selectFile(f.path, f.type, el);
+        renderDetails('sidebar', f);
+      });
       el.appendChild(block);
 
       container.appendChild(el);
@@ -121,6 +125,7 @@
       selection.clear();
       renderSidebar(allFiles);
       updateButtons();
+      clearDetails();
     });
 
     document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
@@ -221,7 +226,10 @@
         rect.dataset.trimStart = entry.trim_start;
         rect.dataset.trimEnd = entry.trim_end;
       }
-      rect.addEventListener('click', () => selectFile(entry.source_path, rect.dataset.kind, rect));
+      rect.addEventListener('click', () => {
+        selectFile(entry.source_path, rect.dataset.kind, rect);
+        renderDetails('timeline', entry);
+      });
       svg.appendChild(rect);
 
       if (width > 40) {
@@ -314,6 +322,42 @@
       row.appendChild(remove);
       container.appendChild(row);
     });
+  }
+
+  function renderDetails(source, entry) {
+    const body = document.getElementById('details-panel-body');
+    body.innerHTML = '';
+
+    // Resolve the file path from either a sidebar file record or a timeline entry.
+    const path = entry.path || entry.source_path;
+    const file = originalFilesByPath[path];
+    if (!file) {
+      body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+      return;
+    }
+
+    const filename = path.split('/').pop();
+
+    const fileSection = document.createElement('div');
+    fileSection.className = 'details-section';
+    fileSection.innerHTML = `
+    <h4>File</h4>
+    <div class="details-row"><span class="label">Name</span><span class="value"><strong>${escapeHtml(filename)}</strong></span></div>
+    <div class="details-row"><span class="label">Type</span><span class="value">${escapeHtml(file.type)}</span></div>
+    <div class="details-row path"><span class="label">Path</span><span class="value">${escapeHtml(path)}</span></div>
+  `;
+    body.appendChild(fileSection);
+  }
+
+  function clearDetails() {
+    const body = document.getElementById('details-panel-body');
+    body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
   async function addToQueue() {
@@ -410,7 +454,8 @@
 
     shiftedFiles.forEach(f => {
       const row = document.createElement('div');
-      const oldTs = originalTimestamps[f.path] || '(none)';
+      const oldRec = originalFilesByPath[f.path];
+      const oldTs = (oldRec && oldRec.timestamp) || '(none)';
       row.textContent = `${f.path.split('/').pop()}  ${oldTs}  →  ${f.timestamp}`;
       diffEl.appendChild(row);
     });
@@ -439,8 +484,8 @@
 
     allFiles = res.files;
     lastPreviewFiles = res.files;
-    originalTimestamps = {};
-    allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
+    originalFilesByPath = {};
+    allFiles.forEach(f => { originalFilesByPath[f.path] = f; });
 
     pendingStack.length = 0;
     selection.clear();
