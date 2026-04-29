@@ -137,9 +137,13 @@ both places — do not duplicate the field list.
 1. Build / update `filesByPath` map from `/api/files` to include the
    new fields.
 2. Snapshot the unshifted file payload — when `/api/files` first
-   loads, retain a copy keyed by path. When previewing offsets, the
-   server returns shifted values; the snapshot lets the panel render
-   `original → shifted` without a second roundtrip.
+   loads, retain a copy of `filesByPath` as `originalFilesByPath`.
+   This snapshot is also refreshed after a successful apply (using
+   the `files` array the apply response returns), since post-apply
+   the on-disk state becomes the new "original". The preview
+   endpoint returns shifted values in `lastPreviewFiles`; the
+   snapshot lets the panel render `original → shifted` without a
+   second roundtrip.
 3. Add `renderDetails(source, entry)` where:
    - `source` is `"sidebar"` or `"timeline"`
    - `entry` is the `/api/files` record (sidebar) or the timeline
@@ -152,11 +156,14 @@ both places — do not duplicate the field list.
      near line 83): call `renderDetails("sidebar", file)`.
    - Timeline rect click (line 224): call
      `renderDetails("timeline", timelineEntry)`.
-5. Pending-sync detection: the client already tracks shifted paths
-   for the sidebar `.shifted-badge`. Reuse that set. When rendering,
-   if the file is in the shifted set AND a preview has been applied
-   to the timeline (preview state flag), render timestamps as
-   `original → shifted`.
+5. Pending-sync detection: the existing client globals
+   `previewIsCurrent` (true after "Update timeline", false after
+   queue change / clear / apply) and `lastPreviewFiles` (each entry
+   has a `shifted: bool` flag set by `build_preview`) drive this.
+   When rendering, if `previewIsCurrent` is true AND the file's
+   entry in `lastPreviewFiles` has `shifted === true`, render
+   timestamps as `original → shifted`, where original comes from
+   `originalFilesByPath` and shifted comes from `lastPreviewFiles`.
 6. "Clear" selection handler additionally resets the panel to the
    empty state.
 
