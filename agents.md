@@ -6,7 +6,7 @@ A Python CLI tool and library for extracting and synchronizing timestamps and ca
 
 - **Photos:** EXIF extraction via Pillow, timestamp writing via piexif
 - **Videos:** Metadata extraction and writing via ffmpeg/ffprobe
-- **CLI:** Click-based with `info`, `batch`, `sync`, `fix-trim`, and `stitch` commands
+- **CLI:** Click-based with `info`, `batch`, `sync`, `fix-trim`, `stitch`, and `web` commands
 
 ## Tech Stack
 
@@ -23,7 +23,11 @@ A Python CLI tool and library for extracting and synchronizing timestamps and ca
 src/photowalk/
 ├── __init__.py          # Public API exports
 ├── api.py               # High-level extract_metadata(path) → PhotoMetadata|VideoMetadata
-├── cli.py               # Click CLI commands: info, batch, sync, stitch
+├── cli.py               # Click CLI commands: info, batch, sync, stitch, web
+├── web/
+│   ├── __init__.py        # Exports create_app, build_app_from_path
+│   ├── server.py          # FastAPI app with timeline and file endpoints
+│   └── assets/            # Embedded SPA (index.html, style.css, app.js)
 ├── models.py            # PhotoMetadata, VideoMetadata dataclasses with to_dict()
 ├── constants.py         # PHOTO_EXTENSIONS, VIDEO_EXTENSIONS sets
 ├── photo_extractors.py  # Pillow-based EXIF reading
@@ -101,6 +105,9 @@ uv run pytest tests/test_offset.py -v
 # Install package in dev mode
 uv pip install -e .
 
+# With web preview support
+uv pip install -e ".[web]"
+
 # Add dependency
 uv add <package>
 
@@ -114,6 +121,7 @@ uv run photowalk sync ~/Photos/ --offset "-2h" --dry-run
 uv run photowalk fix-trim original.mp4 trimmed.mp4 --dry-run
 uv run photowalk stitch ~/Photos/ --output final.mp4 --dry-run
 uv run photowalk stitch ~/Photos/ --output final.mp4 --draft
+uv run photowalk web ~/Photos/ --port 8080
 ```
 
 ## Design Decisions
