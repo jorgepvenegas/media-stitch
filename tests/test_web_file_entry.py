@@ -48,3 +48,11 @@ def test_shifted_flag_passes_through():
     )
     entry = metadata_to_file_entry(Path("/a.jpg"), meta, shifted=True)
     assert entry["shifted"] is True
+
+
+def test_video_with_no_timestamp_marks_has_timestamp_false():
+    meta = VideoMetadata(source_path=Path("/v.mp4"))
+    entry = metadata_to_file_entry(Path("/v.mp4"), meta)
+    assert entry["timestamp"] is None
+    assert entry["has_timestamp"] is False
+    assert entry["duration_seconds"] is None
