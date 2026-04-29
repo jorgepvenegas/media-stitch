@@ -125,6 +125,7 @@
 
     document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
     document.getElementById('btn-update-timeline').addEventListener('click', updateTimeline);
+    document.getElementById('btn-clear-queue').addEventListener('click', clearQueue);
     document.getElementById('btn-apply').addEventListener('click', openApplyModal);
     document.getElementById('btn-modal-cancel').addEventListener('click', closeApplyModal);
     document.getElementById('btn-modal-confirm').addEventListener('click', confirmApply);
@@ -133,6 +134,7 @@
   function updateButtons() {
     document.getElementById('btn-add-to-queue').disabled = selection.size === 0;
     document.getElementById('btn-update-timeline').disabled = pendingStack.length === 0;
+    document.getElementById('btn-clear-queue').disabled = pendingStack.length === 0;
     document.getElementById('btn-apply').disabled = pendingStack.length === 0 || !previewIsCurrent;
   }
 
@@ -355,6 +357,14 @@
     previewIsCurrent = false;
     renderQueue();
     updateButtons();
+  }
+
+  async function clearQueue() {
+    if (pendingStack.length === 0) return;
+    pendingStack.length = 0;
+    document.getElementById('sync-error').textContent = '';
+    renderQueue();
+    await updateTimeline();
   }
 
   async function updateTimeline() {
