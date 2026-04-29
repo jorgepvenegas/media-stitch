@@ -252,6 +252,11 @@ def test_apply_calls_writers_and_refreshes_state(monkeypatch):
     assert body["applied"][0]["new_ts"] == "2024-01-01T13:00:00"
     assert body["failed"] == []
     assert body["files"][0]["timestamp"] == "2024-01-01T13:00:00"
+    assert "shifted" in body["files"][0]
+    if body["files"][0]["type"] == "photo":
+        assert "camera_model" in body["files"][0]
+    else:
+        assert "end_timestamp" in body["files"][0]
     assert app.state.metadata_pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
 
 

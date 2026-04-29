@@ -142,8 +142,12 @@ def test_build_preview_files_include_camera_fields():
         timestamp=datetime(2024, 1, 1, 12, 0, 0),
         camera_model="Canon EOS R6",
         iso=400,
+        shutter_speed="1/250",
+        focal_length="35mm",
     )
     pairs = [(Path("/a.jpg"), photo)]
     result = build_preview(pairs, [], image_duration=3.5)
     assert result["files"][0]["camera_model"] == "Canon EOS R6"
     assert result["files"][0]["iso"] == 400
+    assert result["files"][0]["shutter_speed"] == "1/250"
+    assert result["files"][0]["focal_length"] == "35mm"
