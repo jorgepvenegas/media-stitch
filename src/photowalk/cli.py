@@ -344,17 +344,10 @@ def web(path, port, recursive, image_duration):
         )
         raise Exit(1)
 
-    try:
-        files = collect_files([path], recursive)
-    except RuntimeError as e:
-        click.echo(click.style(str(e), fg="red"), err=True)
-        raise Exit(1)
-
-    if not files:
+    app = build_app_from_path(path, recursive=recursive, image_duration=image_duration)
+    if not app.state.media_count:
         click.echo("No media files found.")
         return
-
-    app = build_app_from_path(path, recursive=recursive, image_duration=image_duration)
     click.echo(click.style(f"Starting server at http://127.0.0.1:{port}", fg="green"))
     click.echo("Press Ctrl+C to stop")
 

@@ -138,4 +138,6 @@ def build_app_from_path(
         prebuilt_file_list.append(_metadata_to_file_entry(f, meta))
 
     timeline = build_timeline(pairs)
-    return create_app(scan_files, timeline, image_duration, file_list=prebuilt_file_list)
+    app = create_app(scan_files, timeline, image_duration, file_list=prebuilt_file_list)
+    app.state.media_count = len(files)
+    return app

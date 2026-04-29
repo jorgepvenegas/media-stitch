@@ -11,7 +11,7 @@
 
   renderSidebar(files);
   if (entries.length > 0) {
-    renderTimeline(entries);
+    renderTimeline(entries, timelineData.settings.image_duration);
   } else {
     document.getElementById('timeline-scroll').innerHTML =
       '<div style="padding:20px;color:#666;">No timeline entries.</div>';
@@ -33,22 +33,29 @@
       const ts = f.timestamp ? new Date(f.timestamp).toLocaleString() : 'No timestamp';
       const dur = f.duration_seconds ? ` • ${f.duration_seconds.toFixed(1)}s` : '';
 
-      el.innerHTML = `
-        <div class="filename">${icon} ${f.path.split('/').pop()}</div>
-        <div class="meta">${ts}${dur}</div>
-      `;
+      const filenameDiv = document.createElement('div');
+      filenameDiv.className = 'filename';
+      filenameDiv.textContent = `${icon} ${f.path.split('/').pop()}`;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'meta';
+      metaDiv.textContent = `${ts}${dur}`;
+      el.appendChild(filenameDiv);
+      el.appendChild(metaDiv);
       el.addEventListener('click', () => selectFile(f.path, f.type, el));
       container.appendChild(el);
     });
   }
 
-  function renderTimeline(entries) {
+  function renderTimeline(entries, imageDuration) {
     const svg = document.getElementById('timeline-svg');
     const scroll = document.getElementById('timeline-scroll');
 
     const times = entries.map(e => new Date(e.start_time).getTime());
     const minTime = Math.min(...times);
-    const maxTime = Math.max(...times.map((t, i) => t + entries[i].duration_seconds * 1000));
+    const maxTime = Math.max(...times.map((t, i) => {
+      const dur = entries[i].kind === 'image' ? imageDuration : entries[i].duration_seconds;
+      return t + dur * 1000;
+    }));
     const totalMs = maxTime - minTime;
     const totalSeconds = totalMs / 1000;
 
@@ -65,7 +72,8 @@
     entries.forEach((entry, i) => {
       const startMs = new Date(entry.start_time).getTime() - minTime;
       const x = padding + (startMs / 1000) * scale;
-      const w = Math.max(2, entry.duration_seconds * scale);
+      const effectiveDuration = entry.kind === 'image' ? imageDuration : entry.duration_seconds;
+      const w = Math.max(2, effectiveDuration * scale);
       const y = padding;
 
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
