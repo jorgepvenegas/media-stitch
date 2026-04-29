@@ -9,7 +9,6 @@ from PIL import Image
 from photowalk.ffmpeg_config import (
     FfmpegEncodeConfig,
     build_scale_pad_filter,
-    ffmpeg_not_found_error,
     _run_ffmpeg_cmd,
 )
 
