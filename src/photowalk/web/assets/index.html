@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Walk — Timeline Preview</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="preview">
+      <video id="preview-video" controls style="display:none;"></video>
+      <img id="preview-image" style="display:none;">
+      <div id="preview-placeholder">Select an item to preview</div>
+    </div>
+    <div id="bottom">
+      <div id="sidebar">
+        <h3>Source Files</h3>
+        <div id="sidebar-list"></div>
+      </div>
+      <div id="timeline">
+        <h3>Timeline</h3>
+        <div id="timeline-scroll">
+          <svg id="timeline-svg"></svg>
+        </div>
+        <div id="timeline-axis"></div>
+      </div>
+    </div>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
