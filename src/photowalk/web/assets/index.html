@@ -13,6 +13,37 @@
       <img id="preview-image" style="display:none;">
       <div id="preview-placeholder">Select an item to preview</div>
     </div>
+
+    <div id="sync-panel">
+      <h3>Sync</h3>
+      <div class="sync-row">
+        <label><input type="radio" name="sync-mode" value="duration" checked> Duration</label>
+        <label><input type="radio" name="sync-mode" value="reference"> Reference pair</label>
+      </div>
+      <div id="sync-duration" class="sync-row">
+        <input type="text" id="sync-duration-input" placeholder="-8h23m5s">
+      </div>
+      <div id="sync-reference" class="sync-row" style="display:none;">
+        <input type="text" id="sync-ref-wrong" placeholder="wrong: 2026-04-27T23:28:01+00:00">
+        <input type="text" id="sync-ref-correct" placeholder="correct: 2026-04-27T07:05:00">
+      </div>
+      <div id="sync-error" class="sync-error"></div>
+      <div class="sync-row">
+        <button id="btn-all-videos" type="button">All videos</button>
+        <button id="btn-all-photos" type="button">All photos</button>
+        <button id="btn-clear-selection" type="button">Clear</button>
+        <span id="sync-selection-count">0 of 0 files selected</span>
+      </div>
+      <div class="sync-row">
+        <button id="btn-add-to-queue" type="button">Add to queue</button>
+      </div>
+      <div id="sync-queue"></div>
+      <div class="sync-row">
+        <button id="btn-update-timeline" type="button" disabled>Update timeline</button>
+        <button id="btn-apply" type="button" disabled>Apply</button>
+      </div>
+    </div>
+
     <div id="bottom">
       <div id="sidebar">
         <h3>Source Files</h3>
@@ -27,6 +58,20 @@
       </div>
     </div>
   </div>
+
+  <div id="apply-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Confirm apply</h3>
+      <div id="apply-diff"></div>
+      <div class="modal-actions">
+        <button id="btn-modal-cancel" type="button">Cancel</button>
+        <button id="btn-modal-confirm" type="button">Apply to disk</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none;"></div>
+
   <script src="/assets/app.js"></script>
 </body>
 </html>
