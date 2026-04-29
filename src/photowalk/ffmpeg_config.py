@@ -34,7 +34,7 @@ def _run_ffmpeg_cmd(cmd: list[str], cancel_event: threading.Event | None = None)
     Raises RuntimeError if ffmpeg is not found.
     """
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except FileNotFoundError:
         raise RuntimeError(ffmpeg_not_found_error())
 
@@ -51,6 +51,12 @@ def _run_ffmpeg_cmd(cmd: list[str], cancel_event: threading.Event | None = None)
                     proc.kill()
                     proc.wait()
                 return False
+
+    if proc.returncode != 0:
+        stderr_text = proc.stderr.read().decode(errors="replace").strip() if proc.stderr else ""
+        if stderr_text:
+            import warnings
+            warnings.warn(f"ffmpeg exited {proc.returncode}: {stderr_text}", stacklevel=2)
 
     return proc.returncode == 0
 

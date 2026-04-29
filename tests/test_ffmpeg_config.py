@@ -2,14 +2,15 @@ import subprocess
 import threading
 from unittest.mock import patch, MagicMock
 
-from photowalk.ffmpeg_config import _run_ffmpeg_cmd, ffmpeg_not_found_error
+import pytest
+
+from photowalk.ffmpeg_config import _run_ffmpeg_cmd
 
 
 def test_run_ffmpeg_cmd_success():
     with patch("photowalk.ffmpeg_config.subprocess.Popen") as mock_popen:
         proc = MagicMock()
-        proc.wait.side_effect = [None, None]  # first wait(timeout=0.5) returns None
-        proc.poll.return_value = 0  # then poll says done
+        proc.wait.return_value = None
         proc.returncode = 0
         mock_popen.return_value = proc
 
@@ -20,9 +21,9 @@ def test_run_ffmpeg_cmd_success():
 def test_run_ffmpeg_cmd_failure():
     with patch("photowalk.ffmpeg_config.subprocess.Popen") as mock_popen:
         proc = MagicMock()
-        proc.wait.side_effect = [None, None]
-        proc.poll.return_value = 1
+        proc.wait.return_value = None
         proc.returncode = 1
+        proc.stderr = None
         mock_popen.return_value = proc
 
         result = _run_ffmpeg_cmd(["ffmpeg", "-version"])
@@ -51,8 +52,5 @@ def test_run_ffmpeg_cmd_cancelled():
 
 def test_run_ffmpeg_cmd_missing_ffmpeg():
     with patch("photowalk.ffmpeg_config.subprocess.Popen", side_effect=FileNotFoundError):
-        try:
+        with pytest.raises(RuntimeError, match="ffmpeg"):
             _run_ffmpeg_cmd(["ffmpeg", "-version"])
-            assert False, "Expected RuntimeError"
-        except RuntimeError as e:
-            assert "ffmpeg" in str(e).lower()
