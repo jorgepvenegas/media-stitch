@@ -132,6 +132,18 @@ Opens a browser UI with three panels:
 - **Source files** (left sidebar) — all scanned files sorted chronologically
 - **Timeline** (right) — single-lane SVG showing video segments and images in order
 
+#### Sync timestamps from the UI
+
+The web preview includes a Sync panel that shifts photo/video timestamps without leaving the browser:
+
+1. Pick the affected files (checkboxes in the sidebar, or "All videos" / "All photos").
+2. Enter an offset — duration string (`-8h23m5s`) or reference pair (`wrong=correct`).
+3. Click "Add to queue" — repeat to layer multiple offsets.
+4. Click "Update timeline" to preview the resulting timeline. Shifted files are marked with a badge.
+5. Click "Apply" to write the new timestamps to disk after a confirmation modal showing each `old → new` change.
+
+Apply is destructive: there is no undo, and the original timestamps are gone after the write.
+
 ## Library Usage
 
 ```python
