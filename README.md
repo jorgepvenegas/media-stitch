@@ -17,6 +17,9 @@ Extract and synchronize timestamps and camera metadata from photos and videos. S
 
 # Clone and install
 uv pip install -e .
+
+# With web preview support (optional)
+uv pip install -e ".[web]"
 ```
 
 ## Usage
@@ -106,6 +109,29 @@ photowalk stitch ~/Photos/2024/ --output final.mp4 --draft
 photowalk stitch ~/Photos/2024/ --output final.mp4 --keep-temp
 ```
 
+### Web timeline preview
+
+Start a local web server to visually preview the timeline before stitching. Requires the `[web]` extra (`uv pip install -e ".[web]"`).
+
+```bash
+# Start server on default port 8080
+photowalk web ~/Photos/2024/
+
+# Use a custom port
+photowalk web ~/Photos/2024/ --port 9000
+
+# Scan subdirectories
+photowalk web ~/Photos/ --recursive
+
+# Change image display duration in the timeline
+photowalk web ~/Photos/2024/ --image-duration 5.0
+```
+
+Opens a browser UI with three panels:
+- **Preview player** (top) — click any timeline item to preview the source video/image
+- **Source files** (left sidebar) — all scanned files sorted chronologically
+- **Timeline** (right) — single-lane SVG showing video segments and images in order
+
 ## Library Usage
 
 ```python
@@ -135,7 +161,8 @@ uv run pytest --cov
 | Module | Purpose |
 |--------|---------|
 | `src/photowalk/api.py` | High-level `extract_metadata()` API |
-| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync`, `fix-trim`, `stitch` commands) |
+| `src/photowalk/cli.py` | Click CLI (`info`, `batch`, `sync`, `fix-trim`, `stitch`, `web` commands) |
+| `src/photowalk/web/server.py` | FastAPI app for timeline web preview |
 | `src/photowalk/models.py` | `PhotoMetadata` and `VideoMetadata` dataclasses |
 | `src/photowalk/photo_extractors.py` | Pillow-based photo EXIF extraction |
 | `src/photowalk/extractors.py` | ffprobe subprocess wrapper for videos |
