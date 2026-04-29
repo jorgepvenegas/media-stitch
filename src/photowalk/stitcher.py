@@ -2,6 +2,7 @@
 
 import subprocess
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 from typing import List
@@ -12,6 +13,7 @@ from photowalk.ffmpeg_config import (
     FfmpegEncodeConfig,
     build_scale_pad_filter,
     ffmpeg_not_found_error,
+    _run_ffmpeg_cmd,
 )
 from photowalk.image_clip import compute_scaled_dimensions, generate_image_clip
 from photowalk.timeline import TimelineEntry, TimelineMap
@@ -52,8 +54,15 @@ def build_concat_list(entries: List[TimelineEntry], output_path: Path) -> Path:
     return output_path
 
 
-def run_concat(concat_list_path: Path, output_path: Path, encode_config: FfmpegEncodeConfig | None = None) -> bool:
+def run_concat(
+    concat_list_path: Path,
+    output_path: Path,
+    encode_config: FfmpegEncodeConfig | None = None,
+    cancel_event: threading.Event | None = None,
+) -> bool:
     """Run ffmpeg concat demuxer."""
+    if cancel_event is not None and cancel_event.is_set():
+        return False
     if encode_config is None:
         encode_config = FfmpegEncodeConfig()
     cmd = [
@@ -70,11 +79,7 @@ def run_concat(concat_list_path: Path, output_path: Path, encode_config: FfmpegE
         "-movflags", "+faststart",
         str(output_path),
     ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        raise RuntimeError(ffmpeg_not_found_error())
-    return result.returncode == 0
+    return _run_ffmpeg_cmd(cmd, cancel_event=cancel_event)
 
 
 def _split_video_segment(
@@ -85,12 +90,15 @@ def _split_video_segment(
     frame_width: int,
     frame_height: int,
     encode_config: FfmpegEncodeConfig | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> bool:
     """Extract a segment from a video using ffmpeg trim.
 
     Re-encodes instead of -c copy to ensure frame-accurate cuts at
     non-keyframe boundaries.
     """
+    if cancel_event is not None and cancel_event.is_set():
+        return False
     if encode_config is None:
         encode_config = FfmpegEncodeConfig()
     duration = trim_end - trim_start
@@ -114,11 +122,7 @@ def _split_video_segment(
         "-movflags", "+faststart",
         str(output_path),
     ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        raise RuntimeError(ffmpeg_not_found_error())
-    return result.returncode == 0
+    return _run_ffmpeg_cmd(cmd, cancel_event=cancel_event)
 
 
 def generate_plan(
@@ -274,6 +278,7 @@ def stitch(
     keep_temp: bool = False,
     draft: bool = False,
     margin: float = 15.0,
+    cancel_event: threading.Event | None = None,
 ) -> bool:
     """Stitch all segments into a single output video."""
     temp_dir = Path(tempfile.mkdtemp(prefix="photowalk_stitch_"))
@@ -283,6 +288,8 @@ def stitch(
     try:
         # Generate image clips and split video segments
         for entry in timeline_map.all_entries:
+            if cancel_event is not None and cancel_event.is_set():
+                return False
             if entry.kind == "image":
                 clip_path = temp_dir / f"img_{entry.source_path.stem}.mp4"
                 ok = generate_image_clip(
@@ -293,6 +300,7 @@ def stitch(
                     image_duration,
                     encode_config=encode_config,
                     margin=margin,
+                    cancel_event=cancel_event,
                 )
                 if not ok:
                     return False
@@ -308,6 +316,7 @@ def stitch(
                     frame_width,
                     frame_height,
                     encode_config=encode_config,
+                    cancel_event=cancel_event,
                 )
                 if not ok:
                     return False
@@ -315,7 +324,7 @@ def stitch(
 
         concat_list_path = temp_dir / "concat_list.txt"
         build_concat_list(timeline_map.all_entries, concat_list_path)
-        ok = run_concat(concat_list_path, output_path, encode_config=encode_config)
+        ok = run_concat(concat_list_path, output_path, encode_config=encode_config, cancel_event=cancel_event)
         return ok
     finally:
         if keep_temp:
