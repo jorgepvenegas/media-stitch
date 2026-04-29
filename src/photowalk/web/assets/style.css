@@ -1,0 +1,111 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  height: 100vh;
+  overflow: hidden;
+}
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* Preview player */
+#preview {
+  height: 40vh;
+  background: #0f0f1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #333;
+}
+#preview video, #preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+#preview-placeholder {
+  color: #666;
+  font-size: 1.2rem;
+}
+
+/* Bottom area */
+#bottom { display: flex; flex: 1; overflow: hidden; }
+
+/* Sidebar */
+#sidebar {
+  width: 260px;
+  background: #16213e;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#sidebar h3 {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #333;
+}
+#sidebar-list { flex: 1; overflow-y: auto; }
+.sidebar-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid #222;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.sidebar-item:hover { background: #1e2a4a; }
+.sidebar-item.selected { background: #2a3a5a; }
+.sidebar-item .filename {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+.sidebar-item .meta {
+  color: #888;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+.sidebar-item.warning .meta { color: #e74c3c; }
+
+/* Timeline */
+#timeline {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#timeline h3 {
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #333;
+}
+#timeline-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+#timeline-svg {
+  height: 100%;
+  min-width: 100%;
+}
+.timeline-bar {
+  cursor: pointer;
+  stroke: #fff;
+  stroke-width: 1;
+}
+.timeline-bar.video { fill: #4a90d9; }
+.timeline-bar.image { fill: #5cb85c; }
+.timeline-bar:hover { opacity: 0.85; }
+.timeline-bar.selected { stroke: #ffd700; stroke-width: 2; }
+.timeline-label {
+  fill: #fff;
+  font-size: 11px;
+  pointer-events: none;
+  dominant-baseline: middle;
+}
+#timeline-axis {
+  height: 30px;
+  border-top: 1px solid #333;
+  background: #16213e;
+  position: relative;
+}
