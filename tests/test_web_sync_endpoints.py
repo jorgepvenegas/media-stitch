@@ -63,3 +63,79 @@ def test_preview_request_rejects_missing_field():
 def test_apply_request_same_shape_as_preview():
     req = ApplyRequest(offsets=[])
     assert req.offsets == []
+
+
+from fastapi.testclient import TestClient
+
+from photowalk.timeline import TimelineMap
+from photowalk.web.server import create_app
+
+
+def _client():
+    return TestClient(create_app(set(), TimelineMap()))
+
+
+def test_parse_duration_ok():
+    r = _client().post(
+        "/api/offset/parse",
+        json={"kind": "duration", "text": "+2h"},
+    )
+    assert r.status_code == 200
+    assert r.json()["delta_seconds"] == 7200.0
+
+
+def test_parse_duration_negative():
+    r = _client().post(
+        "/api/offset/parse",
+        json={"kind": "duration", "text": "-30m"},
+    )
+    assert r.status_code == 200
+    assert r.json()["delta_seconds"] == -1800.0
+
+
+def test_parse_duration_invalid_returns_error():
+    r = _client().post(
+        "/api/offset/parse",
+        json={"kind": "duration", "text": "not-a-duration"},
+    )
+    assert r.status_code == 200
+    assert "error" in r.json()
+
+
+def test_parse_reference_ok():
+    r = _client().post(
+        "/api/offset/parse",
+        json={
+            "kind": "reference",
+            "wrong": "2026-04-27T23:28:01+00:00",
+            "correct": "2026-04-27T07:05:00+00:00",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["delta_seconds"] == -58981.0
+
+
+def test_parse_reference_zero_delta_is_error():
+    r = _client().post(
+        "/api/offset/parse",
+        json={
+            "kind": "reference",
+            "wrong": "2026-04-27T07:05:00+00:00",
+            "correct": "2026-04-27T07:05:00+00:00",
+        },
+    )
+    assert r.status_code == 200
+    assert "error" in r.json()
+
+
+def test_parse_reference_invalid_timestamp_returns_error():
+    r = _client().post(
+        "/api/offset/parse",
+        json={
+            "kind": "reference",
+            "wrong": "garbage",
+            "correct": "2026-04-27T07:05:00",
+        },
+    )
+    assert r.status_code == 200
+    assert "error" in r.json()

@@ -6,6 +6,8 @@ from fastapi.responses import HTMLResponse, FileResponse
 
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
+from photowalk.offset import parse_duration, parse_reference, OffsetError
+from photowalk.web.sync_models import ParseRequest
 
 
 def _load_asset(filename: str) -> str:
@@ -117,6 +119,22 @@ def create_app(
         if not resolved.exists():
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(resolved)
+
+    @app.post("/api/offset/parse")
+    async def api_offset_parse(req: ParseRequest):
+        src = req.root
+        try:
+            if src.kind == "duration":
+                td = parse_duration(src.text)
+            else:
+                td = parse_reference(f"{src.wrong}={src.correct}")
+        except OffsetError as e:
+            return {"error": str(e)}
+
+        delta = td.total_seconds()
+        if delta == 0.0:
+            return {"error": "Offset is zero — nothing to apply"}
+        return {"delta_seconds": delta}
 
     return app
 
