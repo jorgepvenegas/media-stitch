@@ -65,8 +65,12 @@ def test_apply_request_same_shape_as_preview():
     assert req.offsets == []
 
 
+from datetime import datetime
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
+from photowalk.models import PhotoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.web.server import create_app
 
@@ -139,3 +143,68 @@ def test_parse_reference_invalid_timestamp_returns_error():
     )
     assert r.status_code == 200
     assert "error" in r.json()
+
+
+def _client_with_pairs(pairs):
+    timeline = TimelineMap()
+    app = create_app(
+        {p for p, _ in pairs},
+        timeline,
+        metadata_pairs=pairs,
+    )
+    return TestClient(app)
+
+
+def test_preview_empty_stack_returns_unshifted():
+    img = Path("/tmp/a.jpg")
+    pairs = [(img, PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0)))]
+    r = _client_with_pairs(pairs).post("/api/timeline/preview", json={"offsets": []})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["files"][0]["shifted"] is False
+    assert body["files"][0]["timestamp"] == "2024-01-01T12:00:00"
+
+
+def test_preview_with_offset_shifts_file():
+    img = Path("/tmp/a.jpg")
+    pairs = [(img, PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0)))]
+    r = _client_with_pairs(pairs).post(
+        "/api/timeline/preview",
+        json={
+            "offsets": [{
+                "id": "1",
+                "delta_seconds": 3600.0,
+                "source": {"kind": "duration", "text": "+1h"},
+                "target_paths": ["/tmp/a.jpg"],
+            }]
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["files"][0]["shifted"] is True
+    assert body["files"][0]["timestamp"] == "2024-01-01T13:00:00"
+
+
+def test_preview_multi_entry_composes():
+    img = Path("/tmp/a.jpg")
+    pairs = [(img, PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0)))]
+    r = _client_with_pairs(pairs).post(
+        "/api/timeline/preview",
+        json={
+            "offsets": [
+                {
+                    "id": "1",
+                    "delta_seconds": 3600.0,
+                    "source": {"kind": "duration", "text": "+1h"},
+                    "target_paths": ["/tmp/a.jpg"],
+                },
+                {
+                    "id": "2",
+                    "delta_seconds": -1800.0,
+                    "source": {"kind": "duration", "text": "-30m"},
+                    "target_paths": ["/tmp/a.jpg"],
+                },
+            ]
+        },
+    )
+    assert r.json()["files"][0]["timestamp"] == "2024-01-01T12:30:00"

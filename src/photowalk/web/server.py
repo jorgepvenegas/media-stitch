@@ -7,7 +7,8 @@ from fastapi.responses import HTMLResponse, FileResponse
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.offset import parse_duration, parse_reference, OffsetError
-from photowalk.web.sync_models import ParseRequest
+from photowalk.web.sync_models import ParseRequest, PreviewRequest
+from photowalk.web.sync_preview import build_preview
 
 
 def _load_asset(filename: str) -> str:
@@ -135,6 +136,14 @@ def create_app(
         if delta == 0.0:
             return {"error": "Offset is zero — nothing to apply"}
         return {"delta_seconds": delta}
+
+    @app.post("/api/timeline/preview")
+    async def api_timeline_preview(req: PreviewRequest):
+        return build_preview(
+            app.state.metadata_pairs,
+            req.offsets,
+            image_duration=app.state.image_duration,
+        )
 
     return app
 
