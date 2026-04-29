@@ -122,6 +122,7 @@
     });
 
     document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
+    document.getElementById('btn-update-timeline').addEventListener('click', updateTimeline);
   }
 
   function updateButtons() {
@@ -352,7 +353,37 @@
     updateButtons();
   }
 
-  async function updateTimeline() { /* Task 14 */ }
+  async function updateTimeline() {
+    let res;
+    try {
+      res = await fetch('/api/timeline/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offsets: pendingStack }),
+      }).then(r => r.json());
+    } catch (e) {
+      showToast('Could not update timeline', { error: true });
+      return;
+    }
+
+    allFiles = res.files;
+    lastPreviewFiles = res.files;
+    renderSidebar(allFiles);
+    renderTimelineFromData({ entries: res.entries, settings: res.settings });
+    previewIsCurrent = true;
+    updateButtons();
+  }
+
+  function showToast(msg, opts = {}) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (opts.error ? ' error' : '');
+    t.style.display = '';
+    if (!opts.sticky) {
+      setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+  }
+
   async function openApplyModal() { /* Task 15 */ }
 
   // Expose nothing globally — each task wires its own button handler.
