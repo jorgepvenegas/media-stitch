@@ -4,11 +4,14 @@ from typing import Set
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 
+from photowalk.api import extract_metadata
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.offset import parse_duration, parse_reference, OffsetError
-from photowalk.web.sync_models import ParseRequest, PreviewRequest
+from photowalk.web.sync_apply import apply_offsets
+from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
 from photowalk.web.sync_preview import build_preview
+from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
 
 def _load_asset(filename: str) -> str:
@@ -99,8 +102,6 @@ def create_app(
     if file_list is not None:
         _file_list = file_list
     else:
-        from photowalk.api import extract_metadata
-
         _file_list: list[dict] = []
         for _path in sorted(scan_files):
             _meta = extract_metadata(_path)
@@ -144,6 +145,30 @@ def create_app(
             req.offsets,
             image_duration=app.state.image_duration,
         )
+
+    @app.post("/api/sync/apply")
+    async def api_sync_apply(req: ApplyRequest):
+        result = apply_offsets(
+            app.state.metadata_pairs,
+            req.offsets,
+            write_photo=write_photo_timestamp,
+            write_video=write_video_timestamp,
+        )
+
+        refreshed_pairs: list = []
+        for path in sorted(app.state.scan_files):
+            meta = extract_metadata(path)
+            if meta is not None:
+                refreshed_pairs.append((path, meta))
+        app.state.metadata_pairs = refreshed_pairs
+
+        preview = build_preview(refreshed_pairs, [], image_duration=app.state.image_duration)
+        return {
+            "applied": result["applied"],
+            "failed": result["failed"],
+            "files": preview["files"],
+            "timeline": {"entries": preview["entries"], "settings": preview["settings"]},
+        }
 
     return app
 

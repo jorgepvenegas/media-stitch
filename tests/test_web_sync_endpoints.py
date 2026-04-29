@@ -208,3 +208,91 @@ def test_preview_multi_entry_composes():
         },
     )
     assert r.json()["files"][0]["timestamp"] == "2024-01-01T12:30:00"
+
+
+from unittest.mock import patch
+
+
+def test_apply_calls_writers_and_refreshes_state(monkeypatch):
+    img = Path("/tmp/a.jpg")
+    initial = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0))
+    refreshed = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 13, 0, 0))
+    pairs = [(img, initial)]
+
+    timeline = TimelineMap()
+    app = create_app({img}, timeline, metadata_pairs=pairs)
+
+    photo_calls: list = []
+
+    def fake_write_photo(path, dt):
+        photo_calls.append((str(path), dt))
+        return True
+
+    def fake_extract(path):
+        return refreshed
+
+    monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", fake_write_photo)
+    monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
+    monkeypatch.setattr("photowalk.web.server.extract_metadata", fake_extract)
+
+    client = TestClient(app)
+    r = client.post(
+        "/api/sync/apply",
+        json={
+            "offsets": [{
+                "id": "1",
+                "delta_seconds": 3600.0,
+                "source": {"kind": "duration", "text": "+1h"},
+                "target_paths": [str(img)],
+            }]
+        },
+    )
+
+    assert r.status_code == 200
+    body = r.json()
+    assert photo_calls == [(str(img), datetime(2024, 1, 1, 13, 0, 0))]
+    assert len(body["applied"]) == 1
+    assert body["applied"][0]["new_ts"] == "2024-01-01T13:00:00"
+    assert body["failed"] == []
+    assert body["files"][0]["timestamp"] == "2024-01-01T13:00:00"
+    assert app.state.metadata_pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
+
+
+def test_apply_partial_failure_returns_both_lists(monkeypatch):
+    a = Path("/tmp/a.jpg")
+    b = Path("/tmp/b.jpg")
+    pairs = [
+        (a, PhotoMetadata(source_path=a, timestamp=datetime(2024, 1, 1, 12, 0, 0))),
+        (b, PhotoMetadata(source_path=b, timestamp=datetime(2024, 1, 1, 13, 0, 0))),
+    ]
+    app = create_app({a, b}, TimelineMap(), metadata_pairs=pairs)
+
+    def fake_write_photo(path, dt):
+        return str(path) != "/tmp/a.jpg"
+
+    def fake_extract(path):
+        if str(path) == "/tmp/a.jpg":
+            return PhotoMetadata(source_path=a, timestamp=datetime(2024, 1, 1, 12, 0, 0))
+        return PhotoMetadata(source_path=b, timestamp=datetime(2024, 1, 1, 14, 0, 0))
+
+    monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", fake_write_photo)
+    monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
+    monkeypatch.setattr("photowalk.web.server.extract_metadata", fake_extract)
+
+    r = TestClient(app).post(
+        "/api/sync/apply",
+        json={
+            "offsets": [{
+                "id": "1",
+                "delta_seconds": 3600.0,
+                "source": {"kind": "duration", "text": "+1h"},
+                "target_paths": ["/tmp/a.jpg", "/tmp/b.jpg"],
+            }]
+        },
+    )
+
+    body = r.json()
+    failed_paths = [f["path"] for f in body["failed"]]
+    applied_paths = [a_["path"] for a_ in body["applied"]]
+    assert failed_paths == ["/tmp/a.jpg"]
+    assert applied_paths == ["/tmp/b.jpg"]
