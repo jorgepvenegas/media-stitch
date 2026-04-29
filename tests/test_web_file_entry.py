@@ -56,3 +56,45 @@ def test_video_with_no_timestamp_marks_has_timestamp_false():
     assert entry["timestamp"] is None
     assert entry["has_timestamp"] is False
     assert entry["duration_seconds"] is None
+
+
+def test_photo_entry_includes_camera_fields():
+    meta = PhotoMetadata(
+        source_path=Path("/a.jpg"),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        camera_model="Canon EOS R6",
+        shutter_speed="1/250",
+        iso=400,
+        focal_length="35mm",
+    )
+    entry = metadata_to_file_entry(Path("/a.jpg"), meta)
+    assert entry["camera_model"] == "Canon EOS R6"
+    assert entry["shutter_speed"] == "1/250"
+    assert entry["iso"] == 400
+    assert entry["focal_length"] == "35mm"
+
+
+def test_photo_entry_camera_fields_default_to_none():
+    meta = PhotoMetadata(source_path=Path("/a.jpg"))
+    entry = metadata_to_file_entry(Path("/a.jpg"), meta)
+    assert entry["camera_model"] is None
+    assert entry["shutter_speed"] is None
+    assert entry["iso"] is None
+    assert entry["focal_length"] is None
+
+
+def test_video_entry_includes_end_timestamp():
+    meta = VideoMetadata(
+        source_path=Path("/v.mp4"),
+        start_timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        end_timestamp=datetime(2024, 1, 1, 12, 1, 0),
+        duration_seconds=60.0,
+    )
+    entry = metadata_to_file_entry(Path("/v.mp4"), meta)
+    assert entry["end_timestamp"] == "2024-01-01T12:01:00"
+
+
+def test_video_entry_end_timestamp_none_when_missing():
+    meta = VideoMetadata(source_path=Path("/v.mp4"))
+    entry = metadata_to_file_entry(Path("/v.mp4"), meta)
+    assert entry["end_timestamp"] is None

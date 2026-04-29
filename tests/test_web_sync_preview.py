@@ -134,3 +134,16 @@ def test_build_preview_files_sorted_by_path():
     result = build_preview(pairs, [], image_duration=3.5)
     paths = [f["path"] for f in result["files"]]
     assert paths == ["/a.jpg", "/b.jpg"]
+
+
+def test_build_preview_files_include_camera_fields():
+    photo = PhotoMetadata(
+        source_path=Path("/a.jpg"),
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        camera_model="Canon EOS R6",
+        iso=400,
+    )
+    pairs = [(Path("/a.jpg"), photo)]
+    result = build_preview(pairs, [], image_duration=3.5)
+    assert result["files"][0]["camera_model"] == "Canon EOS R6"
+    assert result["files"][0]["iso"] == 400

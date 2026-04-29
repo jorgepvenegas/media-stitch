@@ -24,6 +24,10 @@ def metadata_to_file_entry(
             "duration_seconds": None,
             "has_timestamp": meta.timestamp is not None,
             "shifted": shifted,
+            "camera_model": meta.camera_model,
+            "shutter_speed": meta.shutter_speed,
+            "iso": meta.iso,
+            "focal_length": meta.focal_length,
         }
     return {
         "path": str(path),
@@ -34,4 +38,7 @@ def metadata_to_file_entry(
         "duration_seconds": meta.duration_seconds,
         "has_timestamp": meta.start_timestamp is not None,
         "shifted": shifted,
+        "end_timestamp": (
+            meta.end_timestamp.isoformat() if meta.end_timestamp else None
+        ),
     }

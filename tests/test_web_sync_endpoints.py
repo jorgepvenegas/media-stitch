@@ -335,3 +335,8 @@ def test_get_files_reflects_disk_after_apply(monkeypatch):
     r = client.get("/api/files")
     files = r.json()["files"]
     assert files[0]["timestamp"] == "2024-01-01T13:00:00"
+    assert "shifted" in files[0]
+    if files[0]["type"] == "photo":
+        assert "camera_model" in files[0]
+    else:
+        assert "end_timestamp" in files[0]
