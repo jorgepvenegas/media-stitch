@@ -26,7 +26,10 @@ src/photowalk/
 ├── cli.py               # Click CLI commands: info, batch, sync, stitch, web
 ├── web/
 │   ├── __init__.py        # Exports create_app, build_app_from_path
-│   ├── server.py          # FastAPI app with timeline and file endpoints
+│   ├── server.py          # FastAPI app: timeline, files, sync (parse/preview/apply) endpoints
+│   ├── sync_models.py     # Pydantic request models for sync endpoints
+│   ├── sync_preview.py    # Pure helpers: compute_net_deltas, shift_pairs, build_preview
+│   ├── sync_apply.py      # apply_offsets orchestrator (delegates to writers)
 │   └── assets/            # Embedded SPA (index.html, style.css, app.js)
 ├── models.py            # PhotoMetadata, VideoMetadata dataclasses with to_dict()
 ├── constants.py         # PHOTO_EXTENSIONS, VIDEO_EXTENSIONS sets
