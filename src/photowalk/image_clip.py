@@ -1,12 +1,17 @@
 """Generate white-background video clips from photos."""
 
-import subprocess
+import threading
 from pathlib import Path
 from typing import Tuple
 
 from PIL import Image
 
-from photowalk.ffmpeg_config import FfmpegEncodeConfig, build_scale_pad_filter, ffmpeg_not_found_error
+from photowalk.ffmpeg_config import (
+    FfmpegEncodeConfig,
+    build_scale_pad_filter,
+    ffmpeg_not_found_error,
+    _run_ffmpeg_cmd,
+)
 
 
 def compute_scaled_dimensions(
@@ -36,12 +41,17 @@ def generate_image_clip(
     duration: float = 3.5,
     encode_config: FfmpegEncodeConfig | None = None,
     margin: float = 15.0,
+    cancel_event: threading.Event | None = None,
 ) -> bool:
     """Generate a video clip with white background and centered image.
 
     Args:
         margin: White space percentage on each side (default 15%).
+        cancel_event: If set, abort before or during ffmpeg execution.
     """
+    if cancel_event is not None and cancel_event.is_set():
+        return False
+
     try:
         with Image.open(image_path) as img:
             img_width, img_height = img.size
@@ -83,9 +93,4 @@ def generate_image_clip(
         str(output_path),
     ]
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        raise RuntimeError(ffmpeg_not_found_error())
-
-    return result.returncode == 0
+    return _run_ffmpeg_cmd(cmd, cancel_event=cancel_event)
