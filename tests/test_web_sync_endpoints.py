@@ -210,9 +210,6 @@ def test_preview_multi_entry_composes():
     assert r.json()["files"][0]["timestamp"] == "2024-01-01T12:30:00"
 
 
-from unittest.mock import patch
-
-
 def test_apply_calls_writers_and_refreshes_state(monkeypatch):
     img = Path("/tmp/a.jpg")
     initial = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0))
