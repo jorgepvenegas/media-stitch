@@ -347,11 +347,48 @@
     <div class="details-row path"><span class="label">Path</span><span class="value">${escapeHtml(path)}</span></div>
   `;
     body.appendChild(fileSection);
+
+    const tsSection = document.createElement('div');
+    tsSection.className = 'details-section';
+
+    const dash = '<span class="value" style="color:#666;">—</span>';
+    let rows = '';
+
+    if (file.type === 'photo') {
+      const captured = file.timestamp
+        ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
+        : dash;
+      rows += `<div class="details-row"><span class="label">Captured</span>${captured}</div>`;
+    } else {
+      // video
+      const start = file.timestamp
+        ? `<span class="value">${escapeHtml(formatDateTime(file.timestamp))}</span>`
+        : dash;
+      const end = file.end_timestamp
+        ? `<span class="value">${escapeHtml(formatDateTime(file.end_timestamp))}</span>`
+        : dash;
+      const dur = file.duration_seconds != null
+        ? `<span class="value">${file.duration_seconds.toFixed(2)}s</span>`
+        : dash;
+      rows += `<div class="details-row"><span class="label">Start</span>${start}</div>`;
+      rows += `<div class="details-row"><span class="label">End</span>${end}</div>`;
+      rows += `<div class="details-row"><span class="label">Duration</span>${dur}</div>`;
+    }
+
+    tsSection.innerHTML = `<h4>Timestamps</h4>${rows}`;
+    body.appendChild(tsSection);
   }
 
   function clearDetails() {
     const body = document.getElementById('details-panel-body');
     body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
+  }
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
   }
 
   function escapeHtml(s) {
