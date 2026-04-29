@@ -597,6 +597,7 @@
     renderQueue();
     renderSidebar(allFiles);
     renderTimelineFromData(res.timeline);
+    clearDetails();
     updateButtons();
     closeApplyModal();
 
