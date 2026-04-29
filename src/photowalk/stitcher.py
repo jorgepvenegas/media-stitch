@@ -1,6 +1,5 @@
 """Stitch video segments and image clips into a single output video."""
 
-import subprocess
 import tempfile
 import threading
 import uuid
@@ -12,7 +11,6 @@ from PIL import Image
 from photowalk.ffmpeg_config import (
     FfmpegEncodeConfig,
     build_scale_pad_filter,
-    ffmpeg_not_found_error,
     _run_ffmpeg_cmd,
 )
 from photowalk.image_clip import compute_scaled_dimensions, generate_image_clip
