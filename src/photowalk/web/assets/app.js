@@ -5,6 +5,7 @@
   let allFiles = [];                // most recent files response
   let lastPreviewFiles = [];        // files from last preview, for diff modal
   let previewIsCurrent = false;     // false if stack changed since last preview
+  let originalTimestamps = {};      // path -> ISO string at app load (or after apply)
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -15,6 +16,7 @@
   const filesData = await filesRes.json();
 
   allFiles = filesData.files;
+  allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
   renderSidebar(allFiles);
   renderTimelineFromData(timelineData);
 
@@ -123,6 +125,9 @@
 
     document.getElementById('btn-add-to-queue').addEventListener('click', addToQueue);
     document.getElementById('btn-update-timeline').addEventListener('click', updateTimeline);
+    document.getElementById('btn-apply').addEventListener('click', openApplyModal);
+    document.getElementById('btn-modal-cancel').addEventListener('click', closeApplyModal);
+    document.getElementById('btn-modal-confirm').addEventListener('click', confirmApply);
   }
 
   function updateButtons() {
@@ -384,7 +389,69 @@
     }
   }
 
-  async function openApplyModal() { /* Task 15 */ }
+  async function openApplyModal() {
+    const diffEl = document.getElementById('apply-diff');
+    diffEl.innerHTML = '';
+
+    const shiftedFiles = lastPreviewFiles.filter(f => f.shifted);
+    if (shiftedFiles.length === 0) {
+      showToast('No files would change');
+      return;
+    }
+
+    shiftedFiles.forEach(f => {
+      const row = document.createElement('div');
+      const oldTs = originalTimestamps[f.path] || '(none)';
+      row.textContent = `${f.path.split('/').pop()}  ${oldTs}  →  ${f.timestamp}`;
+      diffEl.appendChild(row);
+    });
+
+    const modal = document.getElementById('apply-modal');
+    modal.style.display = '';
+  }
+
+  function closeApplyModal() {
+    document.getElementById('apply-modal').style.display = 'none';
+  }
+
+  async function confirmApply() {
+    let res;
+    try {
+      res = await fetch('/api/sync/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offsets: pendingStack }),
+      }).then(r => r.json());
+    } catch (e) {
+      showToast('Apply failed — no changes confirmed', { error: true, sticky: true });
+      closeApplyModal();
+      return;
+    }
+
+    allFiles = res.files;
+    lastPreviewFiles = res.files;
+    originalTimestamps = {};
+    allFiles.forEach(f => { originalTimestamps[f.path] = f.timestamp; });
+
+    pendingStack.length = 0;
+    selection.clear();
+    previewIsCurrent = false;
+    renderQueue();
+    renderSidebar(allFiles);
+    renderTimelineFromData(res.timeline);
+    updateButtons();
+    closeApplyModal();
+
+    if (res.failed && res.failed.length > 0) {
+      const lines = res.failed.map(f => `${f.path.split('/').pop()}: ${f.error}`).join('\n');
+      showToast(
+        `Applied ${res.applied.length} of ${res.applied.length + res.failed.length}.\n${lines}`,
+        { error: true, sticky: true },
+      );
+    } else {
+      showToast(`Applied ${res.applied.length} files`);
+    }
+  }
 
   // Expose nothing globally — each task wires its own button handler.
 })();
