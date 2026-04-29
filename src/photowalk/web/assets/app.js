@@ -416,6 +416,29 @@
 
     tsSection.innerHTML = html;
     body.appendChild(tsSection);
+
+    if (file.type === 'photo') {
+      const fields = [
+        ['Camera', file.camera_model],
+        ['Shutter', file.shutter_speed],
+        ['ISO', file.iso != null ? String(file.iso) : null],
+        ['Focal length', file.focal_length],
+      ];
+      const hasAny = fields.some(([, v]) => v != null && v !== '');
+      if (hasAny) {
+        const camSection = document.createElement('div');
+        camSection.className = 'details-section';
+        let camHtml = '<h4>Camera</h4>';
+        for (const [label, value] of fields) {
+          const cell = (value != null && value !== '')
+            ? `<span class="value">${escapeHtml(value)}</span>`
+            : '<span class="value" style="color:#666;">—</span>';
+          camHtml += `<div class="details-row"><span class="label">${escapeHtml(label)}</span>${cell}</div>`;
+        }
+        camSection.innerHTML = camHtml;
+        body.appendChild(camSection);
+      }
+    }
   }
 
   function clearDetails() {
