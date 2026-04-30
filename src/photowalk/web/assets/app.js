@@ -7,6 +7,8 @@
   let previewIsCurrent = false;     // false if stack changed since last preview
   let originalFilesByPath = {};       // path -> full file record at app load (or after apply)
   let renderPollInterval = null;
+  let currentImageDuration = timelineData.settings.image_duration || 3.5;
+  let currentTimelineEntries = timelineData.entries || [];
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -21,12 +23,26 @@
   allFiles.forEach(f => { originalFilesByPath[f.path] = f; });
   renderSidebar(allFiles);
   renderTimelineFromData(timelineData);
+  document.getElementById('timeline-image-duration').value = String(currentImageDuration);
 
   bindSyncPanel();
   updateButtons();
 
+  document.getElementById('timeline-image-duration').addEventListener('change', (e) => {
+    let val = parseFloat(e.target.value);
+    if (Number.isNaN(val) || val < 0.1) {
+      val = 0.1;
+    }
+    currentImageDuration = val;
+    e.target.value = String(val);
+    if (currentTimelineEntries.length > 0) {
+      renderTimeline(currentTimelineEntries, currentImageDuration);
+    }
+  });
+
   function renderTimelineFromData(td) {
     const entries = td.entries;
+    currentTimelineEntries = entries;
     if (entries.length > 0) {
       renderTimeline(entries, td.settings.image_duration);
     } else {
