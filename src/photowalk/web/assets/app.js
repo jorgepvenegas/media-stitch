@@ -10,6 +10,9 @@
   let currentImageDuration = 3.5;
   let currentTimelineEntries = [];
   let selectedRenderFormat = '1920x1080';
+  let selectedPath = null;          // path of the currently selected file
+  let selectedSource = null;        // 'timeline' or 'sidebar' or null
+  let nudgeDebounceTimer = null;
 
   const video = document.getElementById('preview-video');
 
@@ -210,6 +213,8 @@
     document.querySelectorAll('.sidebar-item.selected').forEach(e => e.classList.remove('selected'));
     document.querySelectorAll('.timeline-bar.selected').forEach(e => e.classList.remove('selected'));
     el.classList.add('selected');
+    selectedPath = path;
+    selectedSource = el.classList.contains('sidebar-item') ? 'sidebar' : 'timeline';
     if (el.classList.contains('sidebar-item')) {
       document.querySelectorAll(`.timeline-bar[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
     } else {
@@ -317,6 +322,21 @@
     });
 
     renderAxis(positions, scale, padding, gap);
+
+    if (selectedPath && selectedSource === 'timeline') {
+      const bar = document.querySelector(
+        `.timeline-bar[data-path="${CSS.escape(selectedPath)}"]`,
+      );
+      if (bar) {
+        bar.classList.add('selected');
+        const matchingEntry = entries.find(e => e.source_path === selectedPath);
+        if (matchingEntry) {
+          renderDetails('timeline', matchingEntry);
+        }
+      } else {
+        clearDetails();
+      }
+    }
   }
 
   function renderAxis(positions, scale, padding, gap) {
@@ -394,6 +414,63 @@
     });
   }
 
+  function formatSignedSeconds(seconds) {
+    const sign = seconds >= 0 ? '+' : '-';
+    return `${sign}${Math.abs(seconds)}s`;
+  }
+
+  function findNudgeEntry(path) {
+    const top = pendingStack[pendingStack.length - 1];
+    if (top
+        && top.target_paths.length === 1
+        && top.target_paths[0] === path
+        && top.source.kind === 'duration'
+        && top.source.origin === 'nudge') {
+      return top;
+    }
+    return null;
+  }
+
+  function scheduleDebouncedPreview() {
+    if (nudgeDebounceTimer !== null) clearTimeout(nudgeDebounceTimer);
+    nudgeDebounceTimer = setTimeout(() => {
+      nudgeDebounceTimer = null;
+      updateTimeline();
+    }, 150);
+  }
+
+  function mutateNudge(path, delta) {
+    const top = findNudgeEntry(path);
+    if (top) {
+      top.delta_seconds += delta;
+      if (top.delta_seconds === 0) {
+        const idx = pendingStack.indexOf(top);
+        if (idx !== -1) pendingStack.splice(idx, 1);
+      } else {
+        top.source.text = formatSignedSeconds(top.delta_seconds);
+      }
+    } else {
+      pendingStack.push({
+        id: crypto.randomUUID(),
+        delta_seconds: delta,
+        source: { kind: 'duration', text: formatSignedSeconds(delta), origin: 'nudge' },
+        target_paths: [path],
+      });
+    }
+
+    previewIsCurrent = false;
+    updateButtons();
+    renderQueue();
+
+    const nudge = findNudgeEntry(path);
+    const label = document.querySelector('.adjust-total');
+    if (label) {
+      label.textContent = nudge ? formatSignedSeconds(nudge.delta_seconds) : '';
+    }
+
+    scheduleDebouncedPreview();
+  }
+
   function renderDetails(source, entry) {
     const body = document.getElementById('details-panel-body');
     body.innerHTML = '';
@@ -407,6 +484,28 @@
     }
 
     const filename = path.split('/').pop();
+
+    if (source === 'timeline') {
+      const adjustSection = document.createElement('div');
+      adjustSection.className = 'details-section';
+      const nudge = findNudgeEntry(path);
+      const totalText = nudge ? formatSignedSeconds(nudge.delta_seconds) : '';
+      adjustSection.innerHTML = `
+        <h4>Adjust</h4>
+        <div class="adjust-controls">
+          <button type="button" class="adjust-btn" data-delta="-1" aria-label="Shift earlier 1 second">←</button>
+          <span class="adjust-total">${escapeHtml(totalText)}</span>
+          <button type="button" class="adjust-btn" data-delta="1" aria-label="Shift later 1 second">→</button>
+        </div>
+      `;
+      adjustSection.querySelectorAll('.adjust-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const delta = parseInt(btn.dataset.delta, 10);
+          mutateNudge(path, delta);
+        });
+      });
+      body.appendChild(adjustSection);
+    }
 
     const fileSection = document.createElement('div');
     fileSection.className = 'details-section';
@@ -512,6 +611,8 @@
   }
 
   function clearDetails() {
+    selectedPath = null;
+    selectedSource = null;
     const body = document.getElementById('details-panel-body');
     body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
   }
@@ -671,6 +772,8 @@
     pendingStack.length = 0;
     selection.clear();
     previewIsCurrent = false;
+    selectedPath = null;
+    selectedSource = null;
     renderQueue();
     renderSidebar(allFiles);
     renderTimelineFromData(res.timeline);
