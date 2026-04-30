@@ -9,6 +9,7 @@
   let renderPollInterval = null;
   let currentImageDuration = 3.5;
   let currentTimelineEntries = [];
+  let selectedRenderFormat = '1920x1080';
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -41,6 +42,15 @@
     if (currentTimelineEntries.length > 0) {
       renderTimeline(currentTimelineEntries, currentImageDuration);
     }
+  });
+
+  document.querySelectorAll('.ratio-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedRenderFormat = btn.dataset.format;
+      document.getElementById('ratio-resolution').textContent = selectedRenderFormat.replace('x', ' \u00d7 ');
+    });
   });
 
   function renderTimelineFromData(td) {
