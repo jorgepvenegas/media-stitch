@@ -98,8 +98,14 @@
           <input type="text" id="render-output" placeholder="/path/to/output.mp4">
         </div>
         <div class="render-field">
-          <label>Resolution (optional)</label>
-          <input type="text" id="render-format" placeholder="1920x1080">
+          <label>Aspect ratio</label>
+          <div class="ratio-buttons">
+            <button type="button" class="ratio-btn active" data-format="1920x1080">16:9</button>
+            <button type="button" class="ratio-btn" data-format="1080x1920">9:16</button>
+            <button type="button" class="ratio-btn" data-format="1920x1440">4:3</button>
+            <button type="button" class="ratio-btn" data-format="1080x1440">3:4</button>
+          </div>
+          <div class="ratio-resolution" id="ratio-resolution">1920 × 1080</div>
         </div>
         <div class="render-field row">
           <label>Draft quality</label>
