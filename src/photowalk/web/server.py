@@ -7,16 +7,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 
 from photowalk.catalog import MediaCatalog
-from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.offset import parse_duration, parse_reference, OffsetError
-from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.stitcher import stitch
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 from photowalk.web.stitch_models import StitchRequest, StitchStatus
-from photowalk.web.stitch_runner import start_stitch, cancel_stitch, StitchJob
-from photowalk.use_cases.sync import SyncUseCase
 from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
+from photowalk.web.session import WebSession, StitchConflictError
 
 
 def _load_asset(filename: str) -> str:
@@ -32,16 +29,6 @@ def create_app(
     catalog: MediaCatalog | None = None,
     scan_path: Path | None = None,
 ) -> FastAPI:
-    """Create the FastAPI application.
-
-    Args:
-        scan_files: Set of media file paths that are allowed to be served.
-        timeline: Pre-built timeline to expose via /api/timeline.
-        image_duration: Default display duration (seconds) for image entries.
-        catalog: Pre-built media catalog. When provided, ``extract_metadata`` is
-            NOT called again for /api/files.
-        scan_path: Optional root scan path for the timeline response.
-    """
     app = FastAPI()
 
     if catalog is None:
@@ -53,37 +40,13 @@ def create_app(
                 pairs.append((f, meta))
         catalog = MediaCatalog(pairs)
 
-    app.state.catalog = catalog
-    app.state.metadata_pairs = catalog.pairs
-    app.state.image_duration = image_duration
-    app.state.scan_files = scan_files
-    app.state.file_list = [
-        metadata_to_file_entry(p, m)
-        for p, m in sorted(catalog.pairs, key=lambda pm: str(pm[0]))
-    ]
-    app.state.timeline_map = timeline
-
-    def _serialize_timeline(tl: TimelineMap, scan_path: Path | None = None) -> dict:
-        entries = []
-        for entry in tl.all_entries:
-            data = {
-                "kind": entry.kind,
-                "source_path": str(entry.source_path),
-                "start_time": entry.start_time.isoformat() if entry.start_time else None,
-                "duration_seconds": entry.duration_seconds,
-            }
-            if entry.kind == "video_segment":
-                data["trim_start"] = entry.trim_start
-                data["trim_end"] = entry.trim_end
-                data["original_video"] = str(entry.original_video) if entry.original_video else None
-            entries.append(data)
-        result = {"entries": entries, "settings": {"image_duration": image_duration}}
-        if scan_path is not None:
-            result["scan_path"] = str(scan_path)
-        return result
-
-    app.state.timeline_response = _serialize_timeline(timeline, scan_path)
-    app.state.stitch_job: StitchJob | None = None
+    app.state.session = WebSession(
+        catalog=catalog,
+        timeline_map=timeline,
+        scan_files=scan_files,
+        image_duration=image_duration,
+        scan_path=scan_path,
+    )
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -96,23 +59,27 @@ def create_app(
         if filename not in allowed:
             raise HTTPException(status_code=404, detail="Asset not found")
         content = _load_asset(filename)
-        media_type = "text/css" if filename.endswith(".css") else "application/javascript" if filename.endswith(".js") else "text/html"
+        media_type = (
+            "text/css"
+            if filename.endswith(".css")
+            else "application/javascript"
+            if filename.endswith(".js")
+            else "text/html"
+        )
         return HTMLResponse(content=content, media_type=media_type)
 
     @app.get("/api/timeline")
     async def api_timeline():
-        return app.state.timeline_response
+        return app.state.session.get_timeline()
 
     @app.get("/api/files")
     async def api_files():
-        return {"files": app.state.file_list}
+        return {"files": app.state.session.files}
 
     @app.get("/media/{path:path}")
     async def media(path: str):
         resolved = Path(path).resolve()
-        if resolved not in scan_files:
-            raise HTTPException(status_code=404, detail="File not found")
-        if not resolved.exists():
+        if not app.state.session.is_allowed_media(resolved):
             raise HTTPException(status_code=404, detail="File not found")
         return FileResponse(resolved)
 
@@ -134,46 +101,18 @@ def create_app(
 
     @app.post("/api/timeline/preview")
     async def api_timeline_preview(req: PreviewRequest):
-        image_duration = req.image_duration if req.image_duration is not None else app.state.image_duration
-        deltas = SyncUseCase.compute_net_deltas(req.offsets)
-        preview = SyncUseCase().build_preview(
-            app.state.catalog,
-            deltas,
-            image_duration=image_duration,
+        image_duration = (
+            req.image_duration if req.image_duration is not None else None
         )
-        return {
-            "entries": preview.entries,
-            "settings": preview.settings,
-            "files": preview.files,
-        }
+        return app.state.session.preview(req.offsets, image_duration=image_duration)
 
     @app.post("/api/sync/apply")
     async def api_sync_apply(req: ApplyRequest):
-        deltas = SyncUseCase.compute_net_deltas(req.offsets)
-        result = SyncUseCase().execute(
-            app.state.catalog,
-            deltas,
+        return app.state.session.apply(
+            req.offsets,
             write_photo=write_photo_timestamp,
             write_video=write_video_timestamp,
         )
-        app.state.catalog = result.catalog
-        app.state.metadata_pairs = result.catalog.pairs
-        app.state.file_list = result.preview.files
-        timeline_response = {
-            "entries": result.preview.entries,
-            "settings": result.preview.settings,
-        }
-        if hasattr(app.state, "timeline_response") and isinstance(app.state.timeline_response, dict):
-            if "scan_path" in app.state.timeline_response:
-                timeline_response["scan_path"] = app.state.timeline_response["scan_path"]
-        app.state.timeline_response = timeline_response
-
-        return {
-            "applied": result.applied,
-            "failed": result.failed,
-            "files": result.preview.files,
-            "timeline": timeline_response,
-        }
 
     @app.post("/api/stitch")
     async def api_stitch(req: StitchRequest):
@@ -183,35 +122,30 @@ def create_app(
         if not output_path.parent.exists():
             raise HTTPException(status_code=400, detail="Output directory does not exist")
 
-        if app.state.stitch_job is not None and app.state.stitch_job.state == "running":
+        try:
+            job = app.state.session.start_stitch(req, stitch_fn=stitch)
+        except StitchConflictError:
             raise HTTPException(status_code=409, detail="A render is already in progress")
 
-        job = start_stitch(app.state.timeline_map, req, stitch_fn=stitch)
-        app.state.stitch_job = job
-        return StitchStatus(state="running", message="Stitching...", output_path=req.output).model_dump()
+        return StitchStatus(
+            state="running", message="Stitching...", output_path=req.output
+        ).model_dump()
 
     @app.post("/api/stitch/cancel")
     async def api_stitch_cancel():
-        job = app.state.stitch_job
-        if job is not None and job.state == "running":
-            cancel_stitch(job)
+        cancelled = app.state.session.cancel_stitch()
+        status = app.state.session.stitch_status
+        if cancelled:
             return StitchStatus(
                 state="cancelled",
                 message="Render cancelled",
-                output_path=str(job.output_path) if job.output_path else None,
+                output_path=status.output_path,
             ).model_dump()
-        return StitchStatus(state="idle", message="No render in progress").model_dump()
+        return status.model_dump()
 
     @app.get("/api/stitch/status")
     async def api_stitch_status():
-        job = app.state.stitch_job
-        if job is None:
-            return StitchStatus(state="idle", message="No render in progress").model_dump()
-        return StitchStatus(
-            state=job.state,  # type: ignore[arg-type]
-            message=job.message,
-            output_path=str(job.output_path) if job.output_path else None,
-        ).model_dump()
+        return app.state.session.stitch_status.model_dump()
 
     @app.post("/api/open-folder")
     async def api_open_folder(body: dict):
