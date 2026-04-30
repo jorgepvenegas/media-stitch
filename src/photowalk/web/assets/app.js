@@ -663,7 +663,10 @@
       ? timelineData.scan_path.replace(/\/$/, '') + '/photowalk_output.mp4'
       : '';
     document.getElementById('render-output').value = defaultOutput;
-    document.getElementById('render-format').value = '';
+    selectedRenderFormat = '1920x1080';
+    document.querySelectorAll('.ratio-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.ratio-btn[data-format="1920x1080"]').classList.add('active');
+    document.getElementById('ratio-resolution').textContent = '1920 \u00d7 1080';
     document.getElementById('render-draft').checked = false;
     document.getElementById('render-image-duration').value = String(currentImageDuration);
     document.getElementById('render-margin').value = '15';
