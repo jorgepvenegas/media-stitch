@@ -30,6 +30,7 @@ class ParseRequest(RootModel[OffsetSource]):
 
 class PreviewRequest(BaseModel):
     offsets: list[OffsetEntry]
+    image_duration: float | None = None
 
 
 class ApplyRequest(BaseModel):
