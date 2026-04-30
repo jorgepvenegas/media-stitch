@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 from typing import Set
 
@@ -12,7 +14,10 @@ from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.web.sync_apply import apply_offsets
 from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
 from photowalk.web.sync_preview import build_preview
+from photowalk.stitcher import stitch
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
+from photowalk.web.stitch_models import StitchRequest, StitchStatus
+from photowalk.web.stitch_runner import start_stitch, cancel_stitch, StitchJob
 
 
 def _load_asset(filename: str) -> str:
@@ -27,6 +32,7 @@ def create_app(
     *,
     file_list: "list[dict] | None" = None,
     metadata_pairs: "list[tuple[Path, object]] | None" = None,
+    scan_path: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI application.
 
@@ -46,7 +52,7 @@ def create_app(
     app.state.image_duration = image_duration
     app.state.scan_files = scan_files
 
-    def _serialize_timeline(tl: TimelineMap) -> dict:
+    def _serialize_timeline(tl: TimelineMap, scan_path: Path | None = None) -> dict:
         entries = []
         for entry in tl.all_entries:
             data = {
@@ -60,9 +66,12 @@ def create_app(
                 data["trim_end"] = entry.trim_end
                 data["original_video"] = str(entry.original_video) if entry.original_video else None
             entries.append(data)
-        return {"entries": entries, "settings": {"image_duration": image_duration}}
+        result = {"entries": entries, "settings": {"image_duration": image_duration}}
+        if scan_path is not None:
+            result["scan_path"] = str(scan_path)
+        return result
 
-    app.state.timeline_response = _serialize_timeline(timeline)
+    app.state.timeline_response = _serialize_timeline(timeline, scan_path)
 
     if file_list is not None:
         app.state.file_list = file_list
@@ -74,6 +83,8 @@ def create_app(
                 continue
             _file_list.append(metadata_to_file_entry(_path, _meta))
         app.state.file_list = _file_list
+    app.state.timeline_map = timeline
+    app.state.stitch_job: StitchJob | None = None
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
@@ -158,6 +169,60 @@ def create_app(
             "timeline": timeline_response,
         }
 
+    @app.post("/api/stitch")
+    async def api_stitch(req: StitchRequest):
+        if not req.output.strip():
+            raise HTTPException(status_code=422, detail="Output path is required")
+        output_path = Path(req.output)
+        if not output_path.parent.exists():
+            raise HTTPException(status_code=400, detail="Output directory does not exist")
+
+        if app.state.stitch_job is not None and app.state.stitch_job.state == "running":
+            raise HTTPException(status_code=409, detail="A render is already in progress")
+
+        job = start_stitch(app.state.timeline_map, req, stitch_fn=stitch)
+        app.state.stitch_job = job
+        return StitchStatus(state="running", message="Stitching...", output_path=req.output).model_dump()
+
+    @app.post("/api/stitch/cancel")
+    async def api_stitch_cancel():
+        job = app.state.stitch_job
+        if job is not None and job.state == "running":
+            cancel_stitch(job)
+            return StitchStatus(
+                state="cancelled",
+                message="Render cancelled",
+                output_path=str(job.output_path) if job.output_path else None,
+            ).model_dump()
+        return StitchStatus(state="idle", message="No render in progress").model_dump()
+
+    @app.get("/api/stitch/status")
+    async def api_stitch_status():
+        job = app.state.stitch_job
+        if job is None:
+            return StitchStatus(state="idle", message="No render in progress").model_dump()
+        return StitchStatus(
+            state=job.state,  # type: ignore[arg-type]
+            message=job.message,
+            output_path=str(job.output_path) if job.output_path else None,
+        ).model_dump()
+
+    @app.post("/api/open-folder")
+    async def api_open_folder(body: dict):
+        path = Path(body.get("path", ""))
+        if not path.exists():
+            raise HTTPException(status_code=400, detail="Path does not exist")
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", str(path)], check=False)
+            elif sys.platform == "win32":
+                subprocess.run(["explorer", str(path)], check=False)
+            else:
+                subprocess.run(["xdg-open", str(path)], check=False)
+        except Exception:
+            pass  # Best-effort
+        return {"ok": True}
+
     return app
 
 
@@ -185,7 +250,7 @@ def build_app_from_path(
 
     timeline = build_timeline(pairs)
     app = create_app(
-        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs
+        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs, scan_path=path
     )
     app.state.media_count = len(files)
     return app

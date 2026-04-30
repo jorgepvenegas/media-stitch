@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -84,8 +85,8 @@ def test_build_concat_list_no_duration_or_trailing_duplicate():
 
 
 def test_run_concat_command():
-    with patch("photowalk.stitcher.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        mock_run.return_value = True
         result = run_concat(Path("list.txt"), Path("out.mp4"))
 
     assert result is True
@@ -96,15 +97,15 @@ def test_run_concat_command():
 
 
 def test_run_concat_returns_false_on_failure():
-    with patch("photowalk.stitcher.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=1)
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        mock_run.return_value = False
         result = run_concat(Path("list.txt"), Path("out.mp4"))
 
     assert result is False
 
 
 def test_run_concat_raises_on_missing_ffmpeg():
-    with patch("photowalk.stitcher.subprocess.run", side_effect=FileNotFoundError):
+    with patch("photowalk.stitcher._run_ffmpeg_cmd", side_effect=RuntimeError("ffmpeg not found")):
         try:
             run_concat(Path("list.txt"), Path("out.mp4"))
             assert False, "Expected RuntimeError"
@@ -125,8 +126,8 @@ def test_stitch_success():
     )
 
     with patch("photowalk.stitcher.generate_image_clip", return_value=True) as mock_clip:
-        with patch("photowalk.stitcher.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
             result = stitch(timeline, Path("out.mp4"), 1920, 1080, keep_temp=True)
 
     assert result is True
@@ -164,12 +165,12 @@ def test_stitch_video_segment():
         all_entries=[entry],
     )
 
-    with patch("photowalk.stitcher.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        mock_run.return_value = True
         result = stitch(timeline, Path("out.mp4"), 1920, 1080, keep_temp=True)
 
     assert result is True
-    # subprocess.run called at least twice: once for split, once for concat
+    # _run_ffmpeg_cmd called at least twice: once for split, once for concat
     assert mock_run.call_count >= 2
 
     # Verify the split command re-encodes (not -c copy) with scale filter
@@ -183,8 +184,8 @@ def test_split_video_segment_uses_custom_encode_config():
     from photowalk.stitcher import _split_video_segment
     from photowalk.ffmpeg_config import FfmpegEncodeConfig
 
-    with patch("photowalk.stitcher.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        mock_run.return_value = True
         _split_video_segment(
             Path("in.mp4"), 0.0, 5.0, Path("out.mp4"), 640, 480,
             encode_config=FfmpegEncodeConfig.draft(),
@@ -222,8 +223,8 @@ def test_run_concat_uses_custom_encode_config():
     from photowalk.stitcher import run_concat
     from photowalk.ffmpeg_config import FfmpegEncodeConfig
 
-    with patch("photowalk.stitcher.subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        mock_run.return_value = True
         run_concat(Path("list.txt"), Path("out.mp4"), encode_config=FfmpegEncodeConfig.draft())
     cmd = mock_run.call_args[0][0]
     preset_idx = cmd.index("-preset")
@@ -314,8 +315,8 @@ def test_stitch_draft_mode_uses_draft_params():
     )
 
     with patch("photowalk.stitcher.generate_image_clip", return_value=True) as mock_clip:
-        with patch("photowalk.stitcher.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
             result = stitch(timeline, Path("out.mp4"), 1920, 1080, draft=True, keep_temp=True)
 
     assert result is True
@@ -328,3 +329,68 @@ def test_stitch_draft_mode_uses_draft_params():
     args = mock_clip.call_args[0]
     assert args[2] == 1280  # frame_width
     assert args[3] == 720   # frame_height
+
+
+def test_stitch_cancelled_before_any_clip():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=3.5,
+        kind="image",
+        source_path=Path("photo.jpg"),
+    )
+    timeline = TimelineMap(standalone_images=[entry], all_entries=[entry])
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    with patch("photowalk.stitcher.generate_image_clip") as mock_clip:
+        result = stitch(timeline, Path("out.mp4"), 1920, 1080, cancel_event=cancel_event)
+
+    assert result is False
+    mock_clip.assert_not_called()
+
+
+def test_stitch_cancelled_during_clip():
+    entry = TimelineEntry(
+        start_time=datetime(2024, 7, 15, 12, 0, 0),
+        duration_seconds=3.5,
+        kind="image",
+        source_path=Path("photo.jpg"),
+    )
+    timeline = TimelineMap(standalone_images=[entry], all_entries=[entry])
+    cancel_event = threading.Event()
+
+    def clip_with_cancel(*args, **kwargs):
+        if kwargs.get("cancel_event") is cancel_event:
+            cancel_event.set()
+        return False
+
+    with patch("photowalk.stitcher.generate_image_clip", side_effect=clip_with_cancel):
+        result = stitch(timeline, Path("out.mp4"), 1920, 1080, cancel_event=cancel_event)
+
+    assert result is False
+
+
+def test_run_concat_cancelled():
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        result = run_concat(Path("list.txt"), Path("out.mp4"), cancel_event=cancel_event)
+
+    assert result is False
+    mock_run.assert_not_called()
+
+
+def test_split_video_segment_cancelled():
+    from photowalk.stitcher import _split_video_segment
+    cancel_event = threading.Event()
+    cancel_event.set()
+
+    with patch("photowalk.stitcher._run_ffmpeg_cmd") as mock_run:
+        result = _split_video_segment(
+            Path("in.mp4"), 0.0, 5.0, Path("out.mp4"), 640, 480,
+            cancel_event=cancel_event,
+        )
+
+    assert result is False
+    mock_run.assert_not_called()

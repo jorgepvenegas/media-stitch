@@ -6,6 +6,7 @@
   let lastPreviewFiles = [];        // files from last preview, for diff modal
   let previewIsCurrent = false;     // false if stack changed since last preview
   let originalFilesByPath = {};       // path -> full file record at app load (or after apply)
+  let renderPollInterval = null;
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -134,6 +135,11 @@
     document.getElementById('btn-apply').addEventListener('click', openApplyModal);
     document.getElementById('btn-modal-cancel').addEventListener('click', closeApplyModal);
     document.getElementById('btn-modal-confirm').addEventListener('click', confirmApply);
+
+    document.getElementById('btn-render').addEventListener('click', openRenderModal);
+    document.getElementById('btn-render-cancel').addEventListener('click', closeRenderModal);
+    document.getElementById('btn-render-start').addEventListener('click', startRender);
+    document.getElementById('btn-render-cancel-run').addEventListener('click', cancelRender);
   }
 
   function updateButtons() {
@@ -609,6 +615,127 @@
       );
     } else {
       showToast(`Applied ${res.applied.length} files`);
+    }
+  }
+
+  function openRenderModal() {
+    const defaultOutput = timelineData.scan_path
+      ? timelineData.scan_path.replace(/\/$/, '') + '/photowalk_output.mp4'
+      : '';
+    document.getElementById('render-output').value = defaultOutput;
+    document.getElementById('render-format').value = '';
+    document.getElementById('render-draft').checked = false;
+    document.getElementById('render-image-duration').value = String(timelineData.settings.image_duration || 3.5);
+    document.getElementById('render-margin').value = '15';
+    document.getElementById('render-open-folder').checked = false;
+    document.getElementById('render-form').style.display = '';
+    document.getElementById('render-progress').style.display = 'none';
+    document.getElementById('render-modal').style.display = '';
+  }
+
+  function closeRenderModal() {
+    document.getElementById('render-modal').style.display = 'none';
+    if (renderPollInterval) {
+      clearInterval(renderPollInterval);
+      renderPollInterval = null;
+    }
+  }
+
+  async function startRender() {
+    const output = document.getElementById('render-output').value.trim();
+    if (!output) {
+      showToast('Output path is required', { error: true });
+      return;
+    }
+
+    const format = document.getElementById('render-format').value.trim() || null;
+    const draft = document.getElementById('render-draft').checked;
+    const imageDuration = parseFloat(document.getElementById('render-image-duration').value);
+    const margin = parseFloat(document.getElementById('render-margin').value);
+    const openFolder = document.getElementById('render-open-folder').checked;
+
+    const body = {
+      output,
+      format,
+      draft,
+      image_duration: imageDuration,
+      margin,
+      open_folder: openFolder,
+    };
+
+    let res;
+    try {
+      res = await fetch('/api/stitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      showToast('Failed to start render', { error: true });
+      return;
+    }
+
+    if (res.status === 409) {
+      showToast('A render is already in progress', { error: true });
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.detail || 'Failed to start render', { error: true });
+      return;
+    }
+
+    document.getElementById('render-form').style.display = 'none';
+    document.getElementById('render-progress').style.display = '';
+
+    renderPollInterval = setInterval(pollRenderStatus, 1000);
+  }
+
+  async function pollRenderStatus() {
+    let res;
+    try {
+      res = await fetch('/api/stitch/status');
+    } catch (e) {
+      return;
+    }
+
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (data.state === 'running') {
+      document.querySelector('.render-status').textContent = data.message || 'Stitching...';
+      return;
+    }
+
+    clearInterval(renderPollInterval);
+    renderPollInterval = null;
+
+    if (data.state === 'done') {
+      const openFolder = document.getElementById('render-open-folder').checked;
+      if (openFolder && data.output_path) {
+        const dir = data.output_path.split('/').slice(0, -1).join('/') || '.';
+        fetch('/api/open-folder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: dir }),
+        }).catch(() => {});
+      }
+      showToast('Render complete');
+      closeRenderModal();
+    } else if (data.state === 'cancelled') {
+      showToast('Render cancelled');
+      closeRenderModal();
+    } else if (data.state === 'error') {
+      showToast(data.message || 'Render failed', { error: true, sticky: true });
+      closeRenderModal();
+    }
+  }
+
+  async function cancelRender() {
+    try {
+      await fetch('/api/stitch/cancel', { method: 'POST' });
+    } catch (e) {
+      showToast('Failed to cancel render', { error: true });
     }
   }
 

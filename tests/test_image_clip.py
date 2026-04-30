@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -58,8 +59,8 @@ def test_generate_image_clip_ffmpeg_command():
         mock_img.size = (4000, 3000)
         mock_open.return_value.__enter__.return_value = mock_img
 
-        with patch("photowalk.image_clip.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("photowalk.image_clip._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
             result = generate_image_clip(
                 Path("photo.jpg"), Path("clip.mp4"), 1920, 1080, duration=3.5
             )
@@ -81,8 +82,8 @@ def test_generate_image_clip_returns_false_on_nonzero_returncode():
         mock_img.size = (1920, 1080)
         mock_open.return_value.__enter__.return_value = mock_img
 
-        with patch("photowalk.image_clip.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1)
+        with patch("photowalk.image_clip._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = False
             result = generate_image_clip(
                 Path("photo.jpg"), Path("clip.mp4"), 1920, 1080
             )
@@ -105,8 +106,8 @@ def test_generate_image_clip_uses_custom_encode_config():
         mock_img.size = (1920, 1080)
         mock_open.return_value.__enter__.return_value = mock_img
 
-        with patch("photowalk.image_clip.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("photowalk.image_clip._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
             result = generate_image_clip(
                 Path("photo.jpg"), Path("clip.mp4"), 1920, 1080,
                 encode_config=FfmpegEncodeConfig.draft(),
@@ -127,11 +128,52 @@ def test_generate_image_clip_raises_runtime_error_when_ffmpeg_missing():
         mock_open.return_value.__enter__.return_value = mock_img
 
         with patch(
-            "photowalk.image_clip.subprocess.run",
-            side_effect=FileNotFoundError,
+            "photowalk.image_clip._run_ffmpeg_cmd",
+            side_effect=RuntimeError("ffmpeg not found"),
         ):
             try:
                 generate_image_clip(Path("photo.jpg"), Path("clip.mp4"), 1920, 1080)
                 assert False, "Expected RuntimeError"
             except RuntimeError as e:
                 assert "ffmpeg" in str(e).lower()
+
+
+def test_generate_image_clip_cancelled_before_run():
+    with patch("photowalk.image_clip.Image.open") as mock_open:
+        mock_img = MagicMock()
+        mock_img.size = (1920, 1080)
+        mock_open.return_value.__enter__.return_value = mock_img
+
+        with patch("photowalk.image_clip._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
+            cancel_event = threading.Event()
+            cancel_event.set()
+
+            result = generate_image_clip(
+                Path("photo.jpg"), Path("clip.mp4"), 1920, 1080,
+                cancel_event=cancel_event,
+            )
+
+    assert result is False
+    mock_run.assert_not_called()
+
+
+def test_generate_image_clip_passes_cancel_event():
+    with patch("photowalk.image_clip.Image.open") as mock_open:
+        mock_img = MagicMock()
+        mock_img.size = (1920, 1080)
+        mock_open.return_value.__enter__.return_value = mock_img
+
+        with patch("photowalk.image_clip._run_ffmpeg_cmd") as mock_run:
+            mock_run.return_value = True
+            cancel_event = threading.Event()
+
+            result = generate_image_clip(
+                Path("photo.jpg"), Path("clip.mp4"), 1920, 1080,
+                cancel_event=cancel_event,
+            )
+
+    assert result is True
+    mock_run.assert_called_once()
+    _, kwargs = mock_run.call_args
+    assert kwargs["cancel_event"] is cancel_event
