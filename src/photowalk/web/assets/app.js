@@ -626,6 +626,10 @@
     renderQueue();
     renderSidebar(allFiles);
     renderTimelineFromData(res.timeline);
+    if (res.timeline && res.timeline.settings && res.timeline.settings.image_duration != null) {
+      currentImageDuration = res.timeline.settings.image_duration;
+      document.getElementById('timeline-image-duration').value = String(currentImageDuration);
+    }
     clearDetails();
     updateButtons();
     closeApplyModal();
@@ -648,7 +652,7 @@
     document.getElementById('render-output').value = defaultOutput;
     document.getElementById('render-format').value = '';
     document.getElementById('render-draft').checked = false;
-    document.getElementById('render-image-duration').value = String(timelineData.settings.image_duration || 3.5);
+    document.getElementById('render-image-duration').value = String(currentImageDuration);
     document.getElementById('render-margin').value = '15';
     document.getElementById('render-open-folder').checked = false;
     document.getElementById('render-form').style.display = '';
