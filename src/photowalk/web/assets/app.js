@@ -619,7 +619,10 @@
   }
 
   function openRenderModal() {
-    document.getElementById('render-output').value = '';
+    const defaultOutput = timelineData.scan_path
+      ? timelineData.scan_path.replace(/\/$/, '') + '/photowalk_output.mp4'
+      : '';
+    document.getElementById('render-output').value = defaultOutput;
     document.getElementById('render-format').value = '';
     document.getElementById('render-draft').checked = false;
     document.getElementById('render-image-duration').value = String(timelineData.settings.image_duration || 3.5);

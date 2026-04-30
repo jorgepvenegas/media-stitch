@@ -32,6 +32,7 @@ def create_app(
     *,
     file_list: "list[dict] | None" = None,
     metadata_pairs: "list[tuple[Path, object]] | None" = None,
+    scan_path: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI application.
 
@@ -51,7 +52,7 @@ def create_app(
     app.state.image_duration = image_duration
     app.state.scan_files = scan_files
 
-    def _serialize_timeline(tl: TimelineMap) -> dict:
+    def _serialize_timeline(tl: TimelineMap, scan_path: Path | None = None) -> dict:
         entries = []
         for entry in tl.all_entries:
             data = {
@@ -65,9 +66,12 @@ def create_app(
                 data["trim_end"] = entry.trim_end
                 data["original_video"] = str(entry.original_video) if entry.original_video else None
             entries.append(data)
-        return {"entries": entries, "settings": {"image_duration": image_duration}}
+        result = {"entries": entries, "settings": {"image_duration": image_duration}}
+        if scan_path is not None:
+            result["scan_path"] = str(scan_path)
+        return result
 
-    app.state.timeline_response = _serialize_timeline(timeline)
+    app.state.timeline_response = _serialize_timeline(timeline, scan_path)
 
     if file_list is not None:
         app.state.file_list = file_list
@@ -246,7 +250,7 @@ def build_app_from_path(
 
     timeline = build_timeline(pairs)
     app = create_app(
-        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs
+        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs, scan_path=path
     )
     app.state.media_count = len(files)
     return app
