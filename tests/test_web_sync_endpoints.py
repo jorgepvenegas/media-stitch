@@ -283,7 +283,7 @@ def test_apply_calls_writers_and_refreshes_state(monkeypatch):
         assert "camera_model" in body["files"][0]
     else:
         assert "end_timestamp" in body["files"][0]
-    assert app.state.catalog.pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
+    assert app.state.session.catalog.pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
 
 
 def test_apply_partial_failure_returns_both_lists(monkeypatch):

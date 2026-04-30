@@ -101,9 +101,8 @@ def test_app_state_holds_catalog():
     timeline = TimelineMap()
     catalog = MediaCatalog([(img, meta)])
     app = create_app({img}, timeline, catalog=catalog)
-    assert app.state.catalog == catalog
-    assert app.state.metadata_pairs == [(img, meta)]
-    assert app.state.image_duration == 3.5
+    assert app.state.session.catalog == catalog
+    assert app.state.session.image_duration == 3.5
 
 
 def test_api_files_includes_camera_fields_for_photos(tmp_path):
