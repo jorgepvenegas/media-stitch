@@ -33,6 +33,16 @@ def _make_mock_timeline():
     )
 
 
+def _mock_catalog(mock_timeline):
+    mock = MagicMock()
+    mock.timeline.return_value = mock_timeline
+    mock.pairs = [
+        (Path("video.mp4"), MagicMock()),
+        (Path("photo.jpg"), MagicMock()),
+    ]
+    return mock
+
+
 def test_stitch_draft_flag():
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -40,9 +50,10 @@ def test_stitch_draft_flag():
         Path("photo.jpg").touch()
 
         mock_timeline = _make_mock_timeline()
+        mock_cat = _mock_catalog(mock_timeline)
 
-        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
-            with patch("photowalk.cli.stitch") as mock_stitch:
+        with patch("photowalk.cli.MediaCatalog.scan", return_value=mock_cat):
+            with patch("photowalk.use_cases.stitch.stitch") as mock_stitch:
                 mock_stitch.return_value = True
                 result = runner.invoke(main, [
                     "stitch", ".", "--output", "out.mp4", "--draft"
@@ -63,8 +74,9 @@ def test_stitch_dry_run():
         Path("photo.jpg").touch()
 
         mock_timeline = _make_mock_timeline()
+        mock_cat = _mock_catalog(mock_timeline)
 
-        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
+        with patch("photowalk.cli.MediaCatalog.scan", return_value=mock_cat):
             result = runner.invoke(main, ["stitch", ".", "--output", "out.mp4", "--dry-run"])
 
     assert result.exit_code == 0
@@ -85,8 +97,9 @@ def test_stitch_invalid_format():
         Path("video.mp4").touch()
 
         mock_timeline = _make_mock_timeline()
+        mock_cat = _mock_catalog(mock_timeline)
 
-        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
+        with patch("photowalk.cli.MediaCatalog.scan", return_value=mock_cat):
             result = runner.invoke(main, ["stitch", ".", "--output", "out.mp4", "--format", "bad"])
     assert result.exit_code == 1
     assert "1920x1080" in result.output or "WIDTHxHEIGHT" in result.output
@@ -99,8 +112,9 @@ def test_stitch_plan_writes_json():
         Path("photo.jpg").touch()
 
         mock_timeline = _make_mock_timeline()
+        mock_cat = _mock_catalog(mock_timeline)
 
-        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
+        with patch("photowalk.cli.MediaCatalog.scan", return_value=mock_cat):
             result = runner.invoke(main, [
                 "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
             ])
@@ -123,9 +137,10 @@ def test_stitch_plan_no_video_generation():
         Path("video.mp4").touch()
 
         mock_timeline = _make_mock_timeline()
+        mock_cat = _mock_catalog(mock_timeline)
 
-        with patch("photowalk.cli.build_timeline_from_files", return_value=mock_timeline):
-            with patch("photowalk.cli.stitch") as mock_stitch:
+        with patch("photowalk.cli.MediaCatalog.scan", return_value=mock_cat):
+            with patch("photowalk.use_cases.stitch.stitch") as mock_stitch:
                 result = runner.invoke(main, [
                     "stitch", ".", "--output", "out.mp4", "--plan", "plan.json"
                 ])

@@ -59,24 +59,24 @@ def format_timedelta(td: timedelta) -> str:
     return sign + " ".join(parts) if parts else "0s"
 
 
-# Type alias for sync preview entries: (path, current_ts, new_ts, skip_reason)
-SyncPreviewEntry = tuple[Path, Optional[datetime], Optional[datetime], Optional[str]]
-
-
 def format_sync_preview(
-    preview: list[SyncPreviewEntry], delta: timedelta
+    preview: list, delta: timedelta
 ) -> str:
-    """Format the sync command's preview table."""
+    """Format the sync command's preview table.
+
+    Expects a list of objects with ``path``, ``current``, ``new``, and
+    ``skip_reason`` attributes (e.g. ``SyncPreviewEntry`` dataclass).
+    """
     lines = []
     lines.append(f"{'File':<40} {'Current Timestamp':<30} {'New Timestamp':<30} {'Delta'}")
     lines.append("-" * 120)
-    for f, current, new_time, reason in preview:
-        name = str(f)[:39]
-        if reason:
-            lines.append(f"{name:<40} {'N/A':<30} {'N/A':<30} {reason}")
+    for entry in preview:
+        name = str(entry.path)[:39]
+        if entry.skip_reason:
+            lines.append(f"{name:<40} {'N/A':<30} {'N/A':<30} {entry.skip_reason}")
         else:
-            cur_str = current.isoformat() if current else "N/A"
-            new_str = new_time.isoformat() if new_time else "N/A"
+            cur_str = entry.current.isoformat() if entry.current else "N/A"
+            new_str = entry.new.isoformat() if entry.new else "N/A"
             lines.append(f"{name:<40} {cur_str:<30} {new_str:<30} {format_timedelta(delta)}")
     return "\n".join(lines)
 

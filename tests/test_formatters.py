@@ -12,6 +12,7 @@ from photowalk.formatters import (
 )
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineEntry
+from photowalk.use_cases.sync import SyncPreviewEntry
 
 
 # --- format_table ---
@@ -128,8 +129,8 @@ def test_format_timedelta_zero():
 
 def test_format_sync_preview_with_entries():
     preview = [
-        (Path("/a.jpg"), datetime(2024, 1, 1), datetime(2024, 1, 2), None),
-        (Path("/b.mp4"), None, None, "No timestamp found"),
+        SyncPreviewEntry(Path("/a.jpg"), datetime(2024, 1, 1), datetime(2024, 1, 2), None),
+        SyncPreviewEntry(Path("/b.mp4"), None, None, "No timestamp found"),
     ]
     delta = timedelta(days=1)
     output = format_sync_preview(preview, delta)
