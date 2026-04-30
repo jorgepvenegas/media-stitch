@@ -185,6 +185,8 @@
     document.querySelectorAll('.sidebar-item.selected').forEach(e => e.classList.remove('selected'));
     document.querySelectorAll('.timeline-bar.selected').forEach(e => e.classList.remove('selected'));
     el.classList.add('selected');
+    selectedPath = path;
+    selectedSource = el.classList.contains('sidebar-item') ? 'sidebar' : 'timeline';
     if (el.classList.contains('sidebar-item')) {
       document.querySelectorAll(`.timeline-bar[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
     } else {
@@ -537,6 +539,8 @@
   }
 
   function clearDetails() {
+    selectedPath = null;
+    selectedSource = null;
     const body = document.getElementById('details-panel-body');
     body.innerHTML = '<div id="details-empty">Select a file to see data</div>';
   }
@@ -696,6 +700,8 @@
     pendingStack.length = 0;
     selection.clear();
     previewIsCurrent = false;
+    selectedPath = null;
+    selectedSource = null;
     renderQueue();
     renderSidebar(allFiles);
     renderTimelineFromData(res.timeline);
