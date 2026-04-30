@@ -26,6 +26,11 @@ def test_stitch_request_format_ok():
     assert req.format == "1920x1080"
 
 
+def test_stitch_request_portrait_format_ok():
+    req = StitchRequest(output="/tmp/out.mp4", format="1080x1920")
+    assert req.format == "1080x1920"
+
+
 def test_stitch_request_format_invalid():
     with pytest.raises(ValidationError):
         StitchRequest(output="/tmp/out.mp4", format="abc")
