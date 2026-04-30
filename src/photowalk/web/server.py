@@ -6,18 +6,17 @@ from typing import Set
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 
-from photowalk.api import extract_metadata
+from photowalk.catalog import MediaCatalog
 from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.offset import parse_duration, parse_reference, OffsetError
 from photowalk.web.file_entry import metadata_to_file_entry
-from photowalk.web.sync_apply import apply_offsets
-from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
-from photowalk.web.sync_preview import build_preview
 from photowalk.stitcher import stitch
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 from photowalk.web.stitch_models import StitchRequest, StitchStatus
 from photowalk.web.stitch_runner import start_stitch, cancel_stitch, StitchJob
+from photowalk.use_cases.sync import SyncUseCase
+from photowalk.web.sync_models import ApplyRequest, ParseRequest, PreviewRequest
 
 
 def _load_asset(filename: str) -> str:
@@ -30,8 +29,7 @@ def create_app(
     timeline: TimelineMap,
     image_duration: float = 3.5,
     *,
-    file_list: "list[dict] | None" = None,
-    metadata_pairs: "list[tuple[Path, object]] | None" = None,
+    catalog: MediaCatalog | None = None,
     scan_path: Path | None = None,
 ) -> FastAPI:
     """Create the FastAPI application.
@@ -40,17 +38,30 @@ def create_app(
         scan_files: Set of media file paths that are allowed to be served.
         timeline: Pre-built timeline to expose via /api/timeline.
         image_duration: Default display duration (seconds) for image entries.
-        file_list: Optional pre-built list of file metadata dicts (same shape
-            as /api/files response).  When provided, ``extract_metadata`` is
-            NOT called again — callers that have already extracted metadata
-            (e.g. ``build_app_from_path``) pass it here to avoid double I/O.
-        metadata_pairs: Optional list of (Path, metadata) tuples for use by
-            endpoints like preview/apply that need the original metadata objects.
+        catalog: Pre-built media catalog. When provided, ``extract_metadata`` is
+            NOT called again for /api/files.
+        scan_path: Optional root scan path for the timeline response.
     """
     app = FastAPI()
-    app.state.metadata_pairs = metadata_pairs or []
+
+    if catalog is None:
+        pairs = []
+        for f in sorted(scan_files):
+            from photowalk.api import extract_metadata
+            meta = extract_metadata(f)
+            if meta is not None:
+                pairs.append((f, meta))
+        catalog = MediaCatalog(pairs)
+
+    app.state.catalog = catalog
+    app.state.metadata_pairs = catalog.pairs
     app.state.image_duration = image_duration
     app.state.scan_files = scan_files
+    app.state.file_list = [
+        metadata_to_file_entry(p, m)
+        for p, m in sorted(catalog.pairs, key=lambda pm: str(pm[0]))
+    ]
+    app.state.timeline_map = timeline
 
     def _serialize_timeline(tl: TimelineMap, scan_path: Path | None = None) -> dict:
         entries = []
@@ -72,18 +83,6 @@ def create_app(
         return result
 
     app.state.timeline_response = _serialize_timeline(timeline, scan_path)
-
-    if file_list is not None:
-        app.state.file_list = file_list
-    else:
-        _file_list: list[dict] = []
-        for _path in sorted(scan_files):
-            _meta = extract_metadata(_path)
-            if _meta is None:
-                continue
-            _file_list.append(metadata_to_file_entry(_path, _meta))
-        app.state.file_list = _file_list
-    app.state.timeline_map = timeline
     app.state.stitch_job: StitchJob | None = None
 
     @app.get("/", response_class=HTMLResponse)
@@ -136,37 +135,43 @@ def create_app(
     @app.post("/api/timeline/preview")
     async def api_timeline_preview(req: PreviewRequest):
         image_duration = req.image_duration if req.image_duration is not None else app.state.image_duration
-        return build_preview(
-            app.state.metadata_pairs,
-            req.offsets,
+        deltas = SyncUseCase.compute_net_deltas(req.offsets)
+        preview = SyncUseCase().build_preview(
+            app.state.catalog,
+            deltas,
             image_duration=image_duration,
         )
+        return {
+            "entries": preview.entries,
+            "settings": preview.settings,
+            "files": preview.files,
+        }
 
     @app.post("/api/sync/apply")
     async def api_sync_apply(req: ApplyRequest):
-        result = apply_offsets(
-            app.state.metadata_pairs,
-            req.offsets,
+        deltas = SyncUseCase.compute_net_deltas(req.offsets)
+        result = SyncUseCase().execute(
+            app.state.catalog,
+            deltas,
             write_photo=write_photo_timestamp,
             write_video=write_video_timestamp,
         )
-
-        refreshed_pairs: list = []
-        for path in sorted(app.state.scan_files):
-            meta = extract_metadata(path)
-            if meta is not None:
-                refreshed_pairs.append((path, meta))
-        app.state.metadata_pairs = refreshed_pairs
-
-        preview = build_preview(refreshed_pairs, [], image_duration=app.state.image_duration)
-        timeline_response = {"entries": preview["entries"], "settings": preview["settings"]}
-        app.state.file_list = preview["files"]
+        app.state.catalog = result.catalog
+        app.state.metadata_pairs = result.catalog.pairs
+        app.state.file_list = result.preview.files
+        timeline_response = {
+            "entries": result.preview.entries,
+            "settings": result.preview.settings,
+        }
+        if hasattr(app.state, "timeline_response") and isinstance(app.state.timeline_response, dict):
+            if "scan_path" in app.state.timeline_response:
+                timeline_response["scan_path"] = app.state.timeline_response["scan_path"]
         app.state.timeline_response = timeline_response
 
         return {
-            "applied": result["applied"],
-            "failed": result["failed"],
-            "files": preview["files"],
+            "applied": result.applied,
+            "failed": result.failed,
+            "files": result.preview.files,
             "timeline": timeline_response,
         }
 
@@ -233,25 +238,14 @@ def build_app_from_path(
     image_duration: float = 3.5,
 ) -> FastAPI:
     from photowalk.collector import collect_files
-    from photowalk.api import extract_metadata
     from photowalk.timeline import build_timeline
 
     files = collect_files([path], recursive=recursive)
     scan_files = set(files)
-
-    # Extract metadata once; reuse for both timeline building and /api/files.
-    pairs = []
-    prebuilt_file_list: list[dict] = []
-    for f in sorted(files):
-        meta = extract_metadata(f)
-        if meta is None:
-            continue
-        pairs.append((f, meta))
-        prebuilt_file_list.append(metadata_to_file_entry(f, meta))
-
-    timeline = build_timeline(pairs)
+    catalog = MediaCatalog.scan([path], recursive=recursive)
+    timeline = catalog.timeline()
     app = create_app(
-        scan_files, timeline, image_duration, file_list=prebuilt_file_list, metadata_pairs=pairs, scan_path=path
+        scan_files, timeline, image_duration, catalog=catalog, scan_path=path
     )
     app.state.media_count = len(files)
     return app

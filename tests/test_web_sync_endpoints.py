@@ -70,6 +70,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from photowalk.catalog import MediaCatalog
 from photowalk.models import PhotoMetadata
 from photowalk.timeline import TimelineMap
 from photowalk.web.server import create_app
@@ -150,7 +151,7 @@ def _client_with_pairs(pairs):
     app = create_app(
         {p for p, _ in pairs},
         timeline,
-        metadata_pairs=pairs,
+        catalog=MediaCatalog(pairs),
     )
     return TestClient(app)
 
@@ -242,7 +243,7 @@ def test_apply_calls_writers_and_refreshes_state(monkeypatch):
     pairs = [(img, initial)]
 
     timeline = TimelineMap()
-    app = create_app({img}, timeline, metadata_pairs=pairs)
+    app = create_app({img}, timeline, catalog=MediaCatalog(pairs))
 
     photo_calls: list = []
 
@@ -255,7 +256,7 @@ def test_apply_calls_writers_and_refreshes_state(monkeypatch):
 
     monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", fake_write_photo)
     monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
-    monkeypatch.setattr("photowalk.web.server.extract_metadata", fake_extract)
+    monkeypatch.setattr("photowalk.catalog.extract_metadata", fake_extract)
 
     client = TestClient(app)
     r = client.post(
@@ -282,7 +283,7 @@ def test_apply_calls_writers_and_refreshes_state(monkeypatch):
         assert "camera_model" in body["files"][0]
     else:
         assert "end_timestamp" in body["files"][0]
-    assert app.state.metadata_pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
+    assert app.state.catalog.pairs[0][1].timestamp == datetime(2024, 1, 1, 13, 0, 0)
 
 
 def test_apply_partial_failure_returns_both_lists(monkeypatch):
@@ -292,7 +293,7 @@ def test_apply_partial_failure_returns_both_lists(monkeypatch):
         (a, PhotoMetadata(source_path=a, timestamp=datetime(2024, 1, 1, 12, 0, 0))),
         (b, PhotoMetadata(source_path=b, timestamp=datetime(2024, 1, 1, 13, 0, 0))),
     ]
-    app = create_app({a, b}, TimelineMap(), metadata_pairs=pairs)
+    app = create_app({a, b}, TimelineMap(), catalog=MediaCatalog(pairs))
 
     def fake_write_photo(path, dt):
         return str(path) != "/tmp/a.jpg"
@@ -304,7 +305,7 @@ def test_apply_partial_failure_returns_both_lists(monkeypatch):
 
     monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", fake_write_photo)
     monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
-    monkeypatch.setattr("photowalk.web.server.extract_metadata", fake_extract)
+    monkeypatch.setattr("photowalk.catalog.extract_metadata", fake_extract)
 
     r = TestClient(app).post(
         "/api/sync/apply",
@@ -335,19 +336,12 @@ def test_get_files_reflects_disk_after_apply(monkeypatch):
     app = create_app(
         {img},
         TimelineMap(),
-        metadata_pairs=pairs,
-        file_list=[{
-            "path": str(img),
-            "type": "photo",
-            "timestamp": "2024-01-01T12:00:00",
-            "duration_seconds": None,
-            "has_timestamp": True,
-        }],
+        catalog=MediaCatalog(pairs),
     )
 
     monkeypatch.setattr("photowalk.web.server.write_photo_timestamp", lambda p, d: True)
     monkeypatch.setattr("photowalk.web.server.write_video_timestamp", lambda p, d: True)
-    monkeypatch.setattr("photowalk.web.server.extract_metadata", lambda p: refreshed)
+    monkeypatch.setattr("photowalk.catalog.extract_metadata", lambda p: refreshed)
 
     client = TestClient(app)
     client.post(

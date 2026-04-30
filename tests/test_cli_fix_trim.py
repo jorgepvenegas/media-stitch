@@ -15,8 +15,8 @@ class TestFixTrimDryRun:
         with runner.isolated_filesystem():
             Path("orig.mp4").touch()
             Path("trim.mp4").touch()
-            with patch("photowalk.cli.extract_metadata") as mock_meta:
-                with patch("photowalk.cli.detect_trim_offset", return_value=5.0):
+            with patch("photowalk.use_cases.fix_trim.extract_metadata") as mock_meta:
+                with patch("photowalk.use_cases.fix_trim.detect_trim_offset", return_value=5.0):
                     mock_meta.side_effect = [
                         VideoMetadata(
                             source_path=Path("orig.mp4"),
@@ -43,9 +43,9 @@ class TestFixTrimWrite:
         with runner.isolated_filesystem():
             Path("orig.mp4").touch()
             Path("trim.mp4").touch()
-            with patch("photowalk.cli.extract_metadata") as mock_meta:
-                with patch("photowalk.cli.detect_trim_offset", return_value=5.0):
-                    with patch("photowalk.cli.write_video_timestamp", return_value=True) as mock_write:
+            with patch("photowalk.use_cases.fix_trim.extract_metadata") as mock_meta:
+                with patch("photowalk.use_cases.fix_trim.detect_trim_offset", return_value=5.0):
+                    with patch("photowalk.use_cases.fix_trim.write_video_timestamp", return_value=True) as mock_write:
                         mock_meta.side_effect = [
                             VideoMetadata(
                                 source_path=Path("orig.mp4"),
@@ -71,10 +71,10 @@ class TestFixTrimWrite:
         with runner.isolated_filesystem():
             Path("orig.mp4").write_text("original")
             Path("trim.mp4").write_text("trimmed")
-            with patch("photowalk.cli.extract_metadata") as mock_meta:
-                with patch("photowalk.cli.detect_trim_offset", return_value=5.0):
-                    with patch("photowalk.cli.write_video_timestamp", return_value=True) as mock_write:
-                        with patch("photowalk.cli.shutil.copy2") as mock_copy:
+            with patch("photowalk.use_cases.fix_trim.extract_metadata") as mock_meta:
+                with patch("photowalk.use_cases.fix_trim.detect_trim_offset", return_value=5.0):
+                    with patch("photowalk.use_cases.fix_trim.write_video_timestamp", return_value=True) as mock_write:
+                        with patch("photowalk.use_cases.fix_trim.shutil.copy2") as mock_copy:
                             mock_meta.side_effect = [
                                 VideoMetadata(
                                     source_path=Path("orig.mp4"),
@@ -101,9 +101,9 @@ class TestFixTrimWrite:
         with runner.isolated_filesystem():
             Path("orig.mp4").touch()
             Path("trim.mp4").touch()
-            with patch("photowalk.cli.extract_metadata") as mock_meta:
+            with patch("photowalk.use_cases.fix_trim.extract_metadata") as mock_meta:
                 with patch(
-                    "photowalk.cli.detect_trim_offset",
+                    "photowalk.use_cases.fix_trim.detect_trim_offset",
                     side_effect=OffsetDetectionError("no audio track"),
                 ):
                     mock_meta.return_value = VideoMetadata(
@@ -131,7 +131,7 @@ class TestFixTrimWrite:
         with runner.isolated_filesystem():
             Path("orig.mp4").touch()
             Path("trim.mp4").touch()
-            with patch("photowalk.cli.extract_metadata") as mock_meta:
+            with patch("photowalk.use_cases.fix_trim.extract_metadata") as mock_meta:
                 mock_meta.return_value = VideoMetadata(
                     source_path=Path("orig.mp4"),
                     start_timestamp=None,

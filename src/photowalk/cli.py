@@ -1,28 +1,28 @@
 """Click CLI for photowalk."""
 
 import json
-import shutil
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import click
 from click.exceptions import Exit
 
-from photowalk.api import extract_metadata
-from photowalk.collector import collect_files
-from photowalk.constants import PHOTO_EXTENSIONS, VIDEO_EXTENSIONS
-from photowalk.extractors import run_ffprobe
+from photowalk.catalog import MediaCatalog
+from photowalk.constants import VIDEO_EXTENSIONS
 from photowalk.formatters import (
     format_csv,
     format_sync_preview,
     format_table,
     format_timeline,
 )
-from photowalk.models import PhotoMetadata, VideoMetadata
 from photowalk.offset import compute_offset, OffsetError
-from photowalk.offset_detector import detect_trim_offset, OffsetDetectionError
-from photowalk.stitcher import stitch, compute_draft_resolution, generate_plan
-from photowalk.timeline import build_timeline_from_files
+from photowalk.stitcher import compute_draft_resolution
+from photowalk.use_cases import (
+    BatchUseCase,
+    FixTrimUseCase,
+    StitchUseCase,
+    SyncUseCase,
+    UseCaseError,
+)
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
 try:
@@ -43,6 +43,7 @@ def main():
 @click.argument("path", type=click.Path(exists=True, path_type=Path))
 def info(path: Path):
     """Show metadata for a single file."""
+    from photowalk.api import extract_metadata
     try:
         result = extract_metadata(path)
     except RuntimeError as e:
@@ -64,28 +65,19 @@ def info(path: Path):
 @click.option("--include-videos/--no-include-videos", default=True)
 def batch(paths, output, recursive, include_photos, include_videos):
     """Process multiple files or directories."""
-    try:
-        files = collect_files(list(paths), recursive, include_photos, include_videos)
-    except RuntimeError as e:
-        click.echo(click.style(str(e), fg="red"), err=True)
-        raise Exit(1)
+    catalog = MediaCatalog.scan(
+        list(paths),
+        recursive=recursive,
+        include_photos=include_photos,
+        include_videos=include_videos,
+    )
 
-    if not files:
+    if not catalog.pairs:
         click.echo("No media files found.")
         return
 
-    results = []
-    for f in files:
-        result = extract_metadata(f)
-        if result is not None:
-            results.append(result)
-
-    if output == "json":
-        click.echo(json.dumps([r.to_dict() for r in results], indent=2))
-    elif output == "csv":
-        click.echo(format_csv(results))
-    else:
-        click.echo(format_table(results))
+    result = BatchUseCase().run(catalog, output)
+    click.echo(result.formatted_output)
 
 
 @main.command()
@@ -105,59 +97,29 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
         raise Exit(1)
 
-    try:
-        files = collect_files(list(paths), recursive, include_photos, include_videos)
-    except RuntimeError as e:
-        click.echo(click.style(str(e), fg="red"), err=True)
-        raise Exit(1)
+    catalog = MediaCatalog.scan(
+        list(paths),
+        recursive=recursive,
+        include_photos=include_photos,
+        include_videos=include_videos,
+    )
 
-    if not files:
+    if not catalog.pairs:
         click.echo("No media files found.")
         return
 
-    # Build preview list
-    preview = []  # list of (path, current, new, skipped_reason)
-    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-    for f in files:
-        result = extract_metadata(f)
-        if result is None:
-            preview.append((f, None, None, "Unsupported file type"))
-            continue
-
-        if isinstance(result, PhotoMetadata):
-            current = result.timestamp
-        else:
-            current = result.start_timestamp
-
-        if current is None:
-            preview.append((f, None, None, "No timestamp found"))
-            continue
-
-        new_time = current + delta
-        # Check for pre-1970 (EXIF doesn't support it)
-        if new_time.tzinfo is None:
-            new_time_aware = new_time.replace(tzinfo=timezone.utc)
-        else:
-            new_time_aware = new_time
-        if new_time_aware < epoch:
-            preview.append((f, current, None, "Result would be before 1970"))
-            continue
-
-        preview.append((f, current, new_time, None))
-
+    use_case = SyncUseCase()
+    preview = use_case.build_cli_preview(catalog, delta)
     click.echo(format_sync_preview(preview, delta))
 
     if dry_run:
         return
 
-    # Count writable files
-    writable = [item for item in preview if item[3] is None]
+    writable = [item for item in preview if item.skip_reason is None]
     if not writable:
         click.echo("No files to update.")
         return
 
-    # Confirmation
     if not yes:
         prompt = f"Apply timestamp offset to {len(writable)} file(s)? [y/N]: "
         response = click.prompt(prompt, default="n", show_default=False)
@@ -165,23 +127,17 @@ def sync(paths, offset, reference, recursive, dry_run, yes, include_photos, incl
             click.echo("Cancelled.")
             return
 
-    # Write
-    success_count = 0
-    for f, current, new_time, reason in writable:
-        ext = f.suffix.lower()
-        if ext in PHOTO_EXTENSIONS:
-            ok = write_photo_timestamp(f, new_time)
-        else:
-            ok = write_video_timestamp(f, new_time)
-
-        if ok:
-            success_count += 1
-        else:
-            click.echo(click.style(f"  Failed to update {f}", fg="yellow"))
+    deltas = {str(item.path): delta.total_seconds() for item in writable}
+    result = use_case.execute(
+        catalog,
+        deltas,
+        write_photo=write_photo_timestamp,
+        write_video=write_video_timestamp,
+    )
 
     skipped_count = len(preview) - len(writable)
-    fail_count = len(writable) - success_count
-    msg = f"Updated {success_count} of {len(writable)} file(s)."
+    fail_count = len(writable) - len(result.applied)
+    msg = f"Updated {len(result.applied)} of {len(writable)} file(s)."
     if skipped_count:
         msg += f" {skipped_count} skipped."
     if fail_count:
@@ -209,47 +165,21 @@ def fix_trim(original, trimmed, output, dry_run):
             )
             raise Exit(1)
 
-    original_meta = extract_metadata(original)
-    if not isinstance(original_meta, VideoMetadata) or original_meta.start_timestamp is None:
-        click.echo(
-            click.style("Error: Could not read start timestamp from original video", fg="red"),
-            err=True,
-        )
-        raise Exit(1)
-
     try:
-        offset_seconds = detect_trim_offset(original, trimmed)
-    except OffsetDetectionError as e:
+        result = FixTrimUseCase().run(original, trimmed, output=output, dry_run=dry_run)
+    except UseCaseError as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
         raise Exit(1)
 
-    adjusted_start = original_meta.start_timestamp + timedelta(seconds=offset_seconds)
-
-    trimmed_meta = extract_metadata(trimmed)
-    duration = trimmed_meta.duration_seconds if isinstance(trimmed_meta, VideoMetadata) else None
-    adjusted_end = adjusted_start + timedelta(seconds=duration) if duration else None
-
     if dry_run:
-        click.echo(f"Detected offset: {offset_seconds:.3f}s")
-        click.echo(f"Original start:  {original_meta.start_timestamp.isoformat()}")
-        click.echo(f"Adjusted start:  {adjusted_start.isoformat()}")
-        if adjusted_end:
-            click.echo(f"Adjusted end:    {adjusted_end.isoformat()}")
+        click.echo(f"Detected offset: {result.offset_seconds:.3f}s")
+        click.echo(f"Original start:  {result.original_start.isoformat()}")
+        click.echo(f"Adjusted start:  {result.adjusted_start.isoformat()}")
+        if result.adjusted_end:
+            click.echo(f"Adjusted end:    {result.adjusted_end.isoformat()}")
         return
 
-    target_path = output if output else trimmed
-    if output:
-        shutil.copy2(trimmed, output)
-
-    ok = write_video_timestamp(target_path, adjusted_start)
-    if not ok:
-        click.echo(
-            click.style(f"Error: Failed to write timestamp to {target_path}", fg="red"),
-            err=True,
-        )
-        raise Exit(1)
-
-    click.echo(f"Updated {target_path}")
+    click.echo(f"Updated {result.target_path}")
 
 
 @main.command()
@@ -265,44 +195,33 @@ def fix_trim(original, trimmed, output, dry_run):
 @click.option("--margin", default=15.0, type=float, help="White space margin percentage on each side (default: 15)")
 def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive, draft, plan, margin):
     """Stitch photos and videos into a single chronological video."""
-    files = collect_files([path], recursive)
+    catalog = MediaCatalog.scan([path], recursive=recursive)
 
-    if not files:
+    if not catalog.pairs:
         click.echo("No media files found.")
         return
 
-    timeline = build_timeline_from_files(files)
+    use_case = StitchUseCase()
+    timeline = catalog.timeline()
     all_entries = timeline.all_entries
 
     if not all_entries:
         click.echo("No usable media found (all files missing timestamps).")
         return
 
-    # Determine output resolution
-    frame_width, frame_height = 1920, 1080
-    if fmt:
-        try:
-            frame_width, frame_height = map(int, fmt.split("x"))
-        except ValueError:
-            click.echo(click.style("Error: --format must be WIDTHxHEIGHT (e.g. 1920x1080)", fg="red"), err=True)
-            raise Exit(1)
-    else:
-        # Use first video's resolution via ffprobe
-        for vt in timeline.video_timelines:
-            try:
-                data = run_ffprobe(vt.video_path)
-                if data and "streams" in data:
-                    for stream in data["streams"]:
-                        if stream.get("codec_type") == "video":
-                            frame_width = int(stream.get("width", 1920))
-                            frame_height = int(stream.get("height", 1080))
-                            break
-                    break
-            except Exception:
-                pass
-
     if plan:
-        plan_data = generate_plan(timeline, output, frame_width, frame_height, image_duration, draft, margin)
+        try:
+            plan_data = use_case.generate_plan(
+                catalog,
+                output,
+                resolution=fmt,
+                image_duration=image_duration,
+                draft=draft,
+                margin=margin,
+            )
+        except UseCaseError as e:
+            click.echo(click.style(f"Error: {e}", fg="red"), err=True)
+            raise Exit(1)
         plan.write_text(json.dumps(plan_data, indent=2))
         click.echo(f"Plan written to {plan}")
         return
@@ -312,6 +231,12 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
     if dry_run:
         return
 
+    try:
+        frame_width, frame_height = use_case.resolve_resolution(catalog, fmt)
+    except UseCaseError as e:
+        click.echo(click.style(f"Error: {e}", fg="red"), err=True)
+        raise Exit(1)
+
     if draft:
         frame_width, frame_height = compute_draft_resolution(frame_width, frame_height)
 
@@ -319,7 +244,16 @@ def stitch_cmd(path, output, fmt, image_duration, keep_temp, dry_run, recursive,
     click.echo(f"Resolution: {frame_width}x{frame_height}")
     click.echo("Generating clips and stitching...")
 
-    ok = stitch(timeline, output, frame_width, frame_height, image_duration, keep_temp, draft=draft, margin=margin)
+    ok = use_case.execute(
+        catalog,
+        output,
+        frame_width=frame_width,
+        frame_height=frame_height,
+        image_duration=image_duration,
+        keep_temp=keep_temp,
+        draft=draft,
+        margin=margin,
+    )
     if ok:
         click.echo(click.style("Done!", fg="green"))
     else:
