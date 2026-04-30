@@ -10,6 +10,9 @@
   let currentImageDuration = 3.5;
   let currentTimelineEntries = [];
   let selectedRenderFormat = '1920x1080';
+  let selectedPath = null;          // path of the currently selected file
+  let selectedSource = null;        // 'timeline' or 'sidebar' or null
+  let nudgeDebounceTimer = null;
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -357,6 +360,63 @@
       row.appendChild(remove);
       container.appendChild(row);
     });
+  }
+
+  function formatSignedSeconds(seconds) {
+    const sign = seconds >= 0 ? '+' : '-';
+    return `${sign}${Math.abs(seconds)}s`;
+  }
+
+  function findNudgeEntry(path) {
+    const top = pendingStack[pendingStack.length - 1];
+    if (top
+        && top.target_paths.length === 1
+        && top.target_paths[0] === path
+        && top.source.kind === 'duration'
+        && top.source.origin === 'nudge') {
+      return top;
+    }
+    return null;
+  }
+
+  function scheduleDebouncedPreview() {
+    if (nudgeDebounceTimer !== null) clearTimeout(nudgeDebounceTimer);
+    nudgeDebounceTimer = setTimeout(() => {
+      nudgeDebounceTimer = null;
+      updateTimeline();
+    }, 150);
+  }
+
+  function mutateNudge(path, delta) {
+    const top = findNudgeEntry(path);
+    if (top) {
+      top.delta_seconds += delta;
+      if (top.delta_seconds === 0) {
+        const idx = pendingStack.indexOf(top);
+        if (idx !== -1) pendingStack.splice(idx, 1);
+      } else {
+        top.source.text = formatSignedSeconds(top.delta_seconds);
+      }
+    } else {
+      pendingStack.push({
+        id: crypto.randomUUID(),
+        delta_seconds: delta,
+        source: { kind: 'duration', text: formatSignedSeconds(delta), origin: 'nudge' },
+        target_paths: [path],
+      });
+    }
+
+    previewIsCurrent = false;
+    updateButtons();
+    renderQueue();
+
+    const nudge = findNudgeEntry(path);
+    const label = document.querySelector('.adjust-total');
+    if (label) {
+      label.textContent = nudge ? formatSignedSeconds(nudge.delta_seconds) : '';
+    }
+
+    scheduleDebouncedPreview();
   }
 
   function renderDetails(source, entry) {
