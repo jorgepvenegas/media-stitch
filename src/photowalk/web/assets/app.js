@@ -287,6 +287,21 @@
     });
 
     renderAxis(positions, scale, padding, gap);
+
+    if (selectedPath && selectedSource === 'timeline') {
+      const bar = document.querySelector(
+        `.timeline-bar[data-path="${CSS.escape(selectedPath)}"]`,
+      );
+      if (bar) {
+        bar.classList.add('selected');
+        const matchingEntry = entries.find(e => e.source_path === selectedPath);
+        if (matchingEntry) {
+          renderDetails('timeline', matchingEntry);
+        }
+      } else {
+        clearDetails();
+      }
+    }
   }
 
   function renderAxis(positions, scale, padding, gap) {
@@ -434,6 +449,28 @@
     }
 
     const filename = path.split('/').pop();
+
+    if (source === 'timeline') {
+      const adjustSection = document.createElement('div');
+      adjustSection.className = 'details-section';
+      const nudge = findNudgeEntry(path);
+      const totalText = nudge ? formatSignedSeconds(nudge.delta_seconds) : '';
+      adjustSection.innerHTML = `
+        <h4>Adjust</h4>
+        <div class="adjust-controls">
+          <button type="button" class="adjust-btn" data-delta="-1" aria-label="Shift earlier 1 second">←</button>
+          <span class="adjust-total">${escapeHtml(totalText)}</span>
+          <button type="button" class="adjust-btn" data-delta="1" aria-label="Shift later 1 second">→</button>
+        </div>
+      `;
+      adjustSection.querySelectorAll('.adjust-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const delta = parseInt(btn.dataset.delta, 10);
+          mutateNudge(path, delta);
+        });
+      });
+      body.appendChild(adjustSection);
+    }
 
     const fileSection = document.createElement('div');
     fileSection.className = 'details-section';
