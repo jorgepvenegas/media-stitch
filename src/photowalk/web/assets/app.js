@@ -543,7 +543,10 @@
       res = await fetch('/api/timeline/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ offsets: pendingStack }),
+        body: JSON.stringify({
+          offsets: pendingStack,
+          image_duration: currentImageDuration,
+        }),
       }).then(r => r.json());
     } catch (e) {
       showToast('Could not update timeline', { error: true });
@@ -554,6 +557,10 @@
     lastPreviewFiles = res.files;
     renderSidebar(allFiles);
     renderTimelineFromData({ entries: res.entries, settings: res.settings });
+    if (res.settings && res.settings.image_duration != null) {
+      currentImageDuration = res.settings.image_duration;
+      document.getElementById('timeline-image-duration').value = String(currentImageDuration);
+    }
     previewIsCurrent = true;
     updateButtons();
   }
