@@ -7,8 +7,8 @@
   let previewIsCurrent = false;     // false if stack changed since last preview
   let originalFilesByPath = {};       // path -> full file record at app load (or after apply)
   let renderPollInterval = null;
-  let currentImageDuration = timelineData.settings.image_duration || 3.5;
-  let currentTimelineEntries = timelineData.entries || [];
+  let currentImageDuration = 3.5;
+  let currentTimelineEntries = [];
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -17,6 +17,9 @@
   ]);
   const timelineData = await timelineRes.json();
   const filesData = await filesRes.json();
+
+  currentImageDuration = timelineData.settings.image_duration || 3.5;
+  currentTimelineEntries = timelineData.entries || [];
 
   allFiles = filesData.files;
   originalFilesByPath = {};
