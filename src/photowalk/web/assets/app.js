@@ -11,6 +11,34 @@
   let currentTimelineEntries = [];
   let selectedRenderFormat = '1920x1080';
 
+  const video = document.getElementById('preview-video');
+
+  video.addEventListener('timeupdate', () => {
+    const trimEnd = video.dataset.trimEnd;
+    if (trimEnd !== undefined && video.currentTime >= parseFloat(trimEnd)) {
+      video.pause();
+      video.currentTime = parseFloat(trimEnd);
+    }
+  });
+
+  video.addEventListener('seeking', () => {
+    const trimStart = video.dataset.trimStart;
+    const trimEnd = video.dataset.trimEnd;
+    if (trimStart !== undefined && video.currentTime < parseFloat(trimStart)) {
+      video.currentTime = parseFloat(trimStart);
+    }
+    if (trimEnd !== undefined && video.currentTime > parseFloat(trimEnd)) {
+      video.currentTime = parseFloat(trimEnd);
+    }
+  });
+
+  video.addEventListener('loadedmetadata', () => {
+    const trimStart = video.dataset.trimStart;
+    if (trimStart !== undefined) {
+      video.currentTime = parseFloat(trimStart);
+    }
+  });
+
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
     fetch('/api/timeline'),
@@ -199,6 +227,11 @@
       const trimEnd = el.dataset.trimEnd;
       if (trimStart !== undefined && trimEnd !== undefined) {
         src += '#t=' + parseFloat(trimStart) + ',' + parseFloat(trimEnd);
+        video.dataset.trimStart = trimStart;
+        video.dataset.trimEnd = trimEnd;
+      } else {
+        delete video.dataset.trimStart;
+        delete video.dataset.trimEnd;
       }
       video.src = src;
       video.style.display = 'block';
@@ -210,6 +243,8 @@
       video.style.display = 'none';
       video.pause();
       video.src = '';
+      delete video.dataset.trimStart;
+      delete video.dataset.trimEnd;
     }
   }
 
