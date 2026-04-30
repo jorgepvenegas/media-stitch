@@ -622,7 +622,7 @@
     document.getElementById('render-output').value = '';
     document.getElementById('render-format').value = '';
     document.getElementById('render-draft').checked = false;
-    document.getElementById('render-image-duration').value = String(app.state.image_duration || 3.5);
+    document.getElementById('render-image-duration').value = String(timelineData.settings.image_duration || 3.5);
     document.getElementById('render-margin').value = '15';
     document.getElementById('render-open-folder').checked = false;
     document.getElementById('render-form').style.display = '';
