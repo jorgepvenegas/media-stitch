@@ -691,7 +691,7 @@
       return;
     }
 
-    const format = document.getElementById('render-format').value.trim() || null;
+    const format = selectedRenderFormat;
     const draft = document.getElementById('render-draft').checked;
     const imageDuration = parseFloat(document.getElementById('render-image-duration').value);
     const margin = parseFloat(document.getElementById('render-margin').value);
