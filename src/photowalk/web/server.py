@@ -135,10 +135,11 @@ def create_app(
 
     @app.post("/api/timeline/preview")
     async def api_timeline_preview(req: PreviewRequest):
+        image_duration = req.image_duration if req.image_duration is not None else app.state.image_duration
         return build_preview(
             app.state.metadata_pairs,
             req.offsets,
-            image_duration=app.state.image_duration,
+            image_duration=image_duration,
         )
 
     @app.post("/api/sync/apply")
