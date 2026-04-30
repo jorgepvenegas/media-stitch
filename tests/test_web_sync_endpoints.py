@@ -210,6 +210,31 @@ def test_preview_multi_entry_composes():
     assert r.json()["files"][0]["timestamp"] == "2024-01-01T12:30:00"
 
 
+def test_preview_with_custom_image_duration():
+    """Preview request can override the default image_duration."""
+    img = Path("/tmp/a.jpg")
+    pairs = [(img, PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0)))]
+    r = _client_with_pairs(pairs).post("/api/timeline/preview", json={
+        "offsets": [],
+        "image_duration": 7.5,
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["settings"]["image_duration"] == 7.5
+
+
+def test_preview_fallback_image_duration():
+    """Preview without image_duration falls back to the app default."""
+    img = Path("/tmp/a.jpg")
+    pairs = [(img, PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0)))]
+    r = _client_with_pairs(pairs).post("/api/timeline/preview", json={
+        "offsets": [],
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["settings"]["image_duration"] == 3.5
+
+
 def test_apply_calls_writers_and_refreshes_state(monkeypatch):
     img = Path("/tmp/a.jpg")
     initial = PhotoMetadata(source_path=img, timestamp=datetime(2024, 1, 1, 12, 0, 0))
