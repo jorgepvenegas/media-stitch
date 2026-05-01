@@ -174,6 +174,7 @@ def build_app_from_path(
     from photowalk.collector import collect_files
     from photowalk.timeline import build_timeline
 
+    path = path.resolve()
     files = collect_files([path], recursive=recursive)
     scan_files = set(files)
     catalog = MediaCatalog.scan([path], recursive=recursive)
