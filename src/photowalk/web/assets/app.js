@@ -9,6 +9,7 @@
   let renderPollInterval = null;
   let currentImageDuration = 3.5;
   let currentTimelineEntries = [];
+  let timelineScale = 50;
   let selectedRenderFormat = '1920x1080';
   let selectedPath = null;          // path of the currently selected file
   let selectedSource = null;        // 'timeline' or 'sidebar' or null
@@ -70,6 +71,27 @@
     }
     currentImageDuration = val;
     e.target.value = String(val);
+    if (currentTimelineEntries.length > 0) {
+      renderTimeline(currentTimelineEntries, currentImageDuration);
+    }
+  });
+
+  function updateZoomDisplay() {
+    const pct = Math.round((timelineScale / 50) * 100);
+    document.getElementById('zoom-level').textContent = pct + '%';
+  }
+
+  document.getElementById('btn-zoom-in').addEventListener('click', () => {
+    timelineScale = Math.min(500, timelineScale * 1.2);
+    updateZoomDisplay();
+    if (currentTimelineEntries.length > 0) {
+      renderTimeline(currentTimelineEntries, currentImageDuration);
+    }
+  });
+
+  document.getElementById('btn-zoom-out').addEventListener('click', () => {
+    timelineScale = Math.max(5, timelineScale / 1.2);
+    updateZoomDisplay();
     if (currentTimelineEntries.length > 0) {
       renderTimeline(currentTimelineEntries, currentImageDuration);
     }
@@ -266,8 +288,6 @@
     const padding = 20;
     const gap = 4;
     const svgHeight = barHeight + padding * 2;
-    const scale = 50;
-
     const sorted = [...entries].sort((a, b) =>
       new Date(a.start_time) - new Date(b.start_time)
     );
@@ -275,7 +295,7 @@
     let currentX = padding;
     const positions = sorted.map(entry => {
       const effectiveDuration = entry.kind === 'image' ? imageDuration : entry.duration_seconds;
-      const width = Math.max(2, effectiveDuration * scale);
+      const width = Math.max(2, effectiveDuration * timelineScale);
       const x = currentX;
       currentX += width + gap;
       return { entry, x, width, effectiveDuration };
@@ -321,7 +341,7 @@
       }
     });
 
-    renderAxis(positions, scale, padding, gap);
+    renderAxis(positions, timelineScale, padding, gap);
 
     if (selectedPath && selectedSource === 'timeline') {
       const bar = document.querySelector(

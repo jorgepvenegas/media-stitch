@@ -401,6 +401,37 @@ body {
   border-color: #4dabf7;
 }
 
+.timeline-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.timeline-zoom-control button {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  min-width: 28px;
+}
+
+.timeline-zoom-control button:hover {
+  background: #3a3a3a;
+  border-color: #666;
+}
+
+.timeline-zoom-control #zoom-level {
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .ratio-buttons {
   display: flex;
   gap: 8px;
