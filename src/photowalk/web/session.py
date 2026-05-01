@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Set
 
 from photowalk.catalog import MediaCatalog
-from photowalk.timeline import TimelineMap
+from photowalk.timeline import TimelineMap, build_timeline
 from photowalk.use_cases.sync import SyncUseCase
 from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.web.stitch_models import StitchRequest, StitchStatus
@@ -24,6 +24,7 @@ class WebSession:
     image_duration: float = 3.5
     scan_path: Path | None = None
     _stitch_job: StitchJob | None = field(default=None, repr=False)
+    _preview_timeline: TimelineMap | None = field(default=None, repr=False)
 
     # ------------------------------------------------------------------ #
     # Queries
@@ -75,6 +76,9 @@ class WebSession:
             deltas,
             image_duration=dur,
         )
+        # Store the preview timeline so stitch can use it if the user
+        # renders before applying (or after previewing further changes).
+        self._preview_timeline = preview.timeline_map
         return {
             "entries": preview.entries,
             "settings": preview.settings,
@@ -98,6 +102,8 @@ class WebSession:
         self.catalog = result.catalog
         # Rebuild timeline so subsequent stitch / timeline queries stay consistent.
         self.timeline_map = self.catalog.timeline(image_duration=self.image_duration)
+        # Clear preview — the applied timeline is now the base.
+        self._preview_timeline = None
         return {
             "applied": result.applied,
             "failed": result.failed,
@@ -112,7 +118,10 @@ class WebSession:
     def start_stitch(self, request: StitchRequest, *, stitch_fn=None) -> StitchJob:
         if self._stitch_job is not None and self._stitch_job.state == "running":
             raise StitchConflictError("A render is already in progress")
-        job = start_stitch(self.timeline_map, request, stitch_fn=stitch_fn)
+        # Use the preview timeline if the user has pending (previewed)
+        # offsets; otherwise fall back to the base timeline.
+        effective_timeline = self._preview_timeline or self.timeline_map
+        job = start_stitch(effective_timeline, request, stitch_fn=stitch_fn)
         self._stitch_job = job
         return job
 

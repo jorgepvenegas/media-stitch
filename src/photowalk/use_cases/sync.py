@@ -7,7 +7,7 @@ from typing import Callable, Optional
 
 from photowalk.catalog import MediaCatalog
 from photowalk.models import PhotoMetadata, VideoMetadata
-from photowalk.timeline import MediaInput, build_timeline
+from photowalk.timeline import MediaInput, TimelineMap, build_timeline
 from photowalk.web.file_entry import metadata_to_file_entry
 from photowalk.writers import write_photo_timestamp, write_video_timestamp
 
@@ -29,6 +29,7 @@ class SyncPreview:
     files: list[dict]
     settings: dict
     shifted_paths: set[str]
+    timeline_map: TimelineMap | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,7 @@ class SyncUseCase:
             files=files,
             settings={"image_duration": image_duration},
             shifted_paths=shifted_paths,
+            timeline_map=timeline,
         )
 
     def build_cli_preview(
