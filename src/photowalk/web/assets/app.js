@@ -100,11 +100,10 @@
     const tsMs = new Date(currentVideoFile.timestamp).getTime() + (offsetSeconds * 1000);
     const tsDate = new Date(tsMs);
 
-    // Format timestamps
-    const human = tsDate.toLocaleString();
+    // Format timestamp as ISO
     const iso = tsDate.toISOString();
 
-    document.getElementById('timestamp-human').textContent = human;
+    document.getElementById('timestamp-human').textContent = iso;
     document.getElementById('timestamp-iso').textContent = iso;
 
     // Wire copy button (only once)
@@ -240,7 +239,7 @@
       block.className = 'filename-block';
 
       const icon = f.type === 'video' ? '🎬' : '📷';
-      const ts = f.timestamp ? new Date(f.timestamp).toLocaleString() : 'No timestamp';
+      const ts = f.timestamp ? new Date(f.timestamp).toISOString() : 'No timestamp';
       const dur = f.duration_seconds ? ` • ${f.duration_seconds.toFixed(1)}s` : '';
 
       const filenameDiv = document.createElement('div');
@@ -756,7 +755,7 @@
     if (!iso) return '';
     const d = new Date(iso);
     if (isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    return d.toISOString();
   }
 
   function escapeHtml(s) {
