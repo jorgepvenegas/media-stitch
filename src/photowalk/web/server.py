@@ -17,6 +17,11 @@ from photowalk.web.session import WebSession, StitchConflictError
 
 
 def _load_asset(filename: str) -> str:
+    # Primary: Vue app build output
+    vue_dist = Path(__file__).parent / "vue-app" / "dist"
+    if (vue_dist / filename).exists():
+        return (vue_dist / filename).read_text()
+    # Fallback: legacy assets
     asset_dir = Path(__file__).parent / "assets"
     return (asset_dir / filename).read_text()
 
@@ -55,6 +60,12 @@ def create_app(
 
     @app.get("/assets/{filename}")
     async def asset(filename: str):
+        # Serve from Vue build output (hashed assets in dist/assets/)
+        vue_assets = Path(__file__).parent / "vue-app" / "dist" / "assets"
+        file_path = vue_assets / filename
+        if file_path.exists():
+            return FileResponse(file_path)
+        # Fallback: legacy assets
         allowed = {"style.css", "app.js", "index.html"}
         if filename not in allowed:
             raise HTTPException(status_code=404, detail="Asset not found")
