@@ -325,7 +325,7 @@
     document.getElementById('btn-apply').disabled = pendingStack.length === 0 || !previewIsCurrent;
   }
 
-  function selectFile(path, type, el) {
+  function selectFile(path, type, el, timelineEntry = null) {
     document.querySelectorAll('.sidebar-item.selected').forEach(e => e.classList.remove('selected'));
     document.querySelectorAll('.timeline-bar.selected').forEach(e => e.classList.remove('selected'));
     el.classList.add('selected');
@@ -348,7 +348,9 @@
 
     if (type === 'video') {
       // Store file record for timestamp calculations
-      currentVideoFile = originalFilesByPath[path] || null;
+      // Use preview files if available (to show shifted timestamp), otherwise fall back to originals
+      const fileSource = previewIsCurrent ? lastPreviewFiles : allFiles;
+      currentVideoFile = fileSource.find(f => f.path === path) || originalFilesByPath[path] || null;
 
       let src = '/media/' + path;
       const trimStart = el.dataset.trimStart;
@@ -431,7 +433,7 @@
         rect.dataset.trimEnd = entry.trim_end;
       }
       rect.addEventListener('click', () => {
-        selectFile(entry.source_path, rect.dataset.kind, rect);
+        selectFile(entry.source_path, rect.dataset.kind, rect, entry);
         renderDetails('timeline', entry);
       });
       svg.appendChild(rect);
