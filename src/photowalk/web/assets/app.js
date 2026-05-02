@@ -121,6 +121,20 @@
         });
       });
     }
+
+    // Wire "Use as correct" button (only once)
+    const useRefBtn = document.getElementById('timestamp-use-ref-btn');
+    if (!useRefBtn.dataset.wired) {
+      useRefBtn.dataset.wired = 'true';
+      useRefBtn.addEventListener('click', () => {
+        // Switch to reference mode
+        document.querySelector('input[name="sync-mode"][value="reference"]').checked = true;
+        document.getElementById('sync-duration').style.display = 'none';
+        document.getElementById('sync-reference').style.display = '';
+        // Fill the correct timestamp
+        document.getElementById('sync-ref-correct').value = iso;
+      });
+    }
   }
 
   // ----- Initial load -----
