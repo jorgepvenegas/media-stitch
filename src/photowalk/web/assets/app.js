@@ -362,6 +362,12 @@
     }
 
     renderTimestampPanel();
+
+    // Pre-populate the "wrong" timestamp field with the file's original timestamp
+    const file = originalFilesByPath[path];
+    if (file && file.timestamp) {
+      document.getElementById('sync-ref-wrong').value = file.timestamp;
+    }
   }
 
   function formatTime(seconds) {
