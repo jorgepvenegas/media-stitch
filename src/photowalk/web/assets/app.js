@@ -13,6 +13,8 @@
   let selectedRenderFormat = '1920x1080';
   let selectedPath = null;          // path of the currently selected file
   let selectedSource = null;        // 'timeline' or 'sidebar' or null
+  let currentVideoFile = null;      // currently selected video file record
+  let videoPaused = true;           // track playback state
   let nudgeDebounceTimer = null;
 
   const video = document.getElementById('preview-video');
@@ -42,6 +44,84 @@
       video.currentTime = parseFloat(trimStart);
     }
   });
+
+  video.addEventListener('play', () => {
+    videoPaused = false;
+    renderTimestampPanel();
+  });
+
+  video.addEventListener('pause', () => {
+    videoPaused = true;
+    renderTimestampPanel();
+  });
+
+  video.addEventListener('ended', () => {
+    videoPaused = true;
+    renderTimestampPanel();
+  });
+
+  // ----- Timestamp panel rendering -----
+  function renderTimestampPanel() {
+    const label = document.getElementById('timestamp-label');
+    const display = document.getElementById('timestamp-display');
+    const copyBtn = document.getElementById('timestamp-copy-btn');
+
+    if (!selectedPath || !currentVideoFile) {
+      // No selection
+      label.style.display = '';
+      label.textContent = 'Select a video to see timestamp';
+      display.classList.remove('visible');
+      return;
+    }
+
+    if (currentVideoFile.type !== 'video') {
+      // Photo selected
+      label.style.display = '';
+      label.textContent = 'No playback for photos';
+      display.classList.remove('visible');
+      return;
+    }
+
+    if (!videoPaused) {
+      // Video playing
+      label.style.display = '';
+      label.textContent = 'Playing...';
+      display.classList.remove('visible');
+      return;
+    }
+
+    // Video paused - show timestamp
+    label.style.display = 'none';
+    display.classList.add('visible');
+
+    // Calculate actual timestamp: file.timestamp + (currentTime - trimStart)
+    const trimStart = video.dataset.trimStart ? parseFloat(video.dataset.trimStart) : 0;
+    const offsetSeconds = video.currentTime - trimStart;
+    const tsMs = new Date(currentVideoFile.timestamp).getTime() + (offsetSeconds * 1000);
+    const tsDate = new Date(tsMs);
+
+    // Format timestamps
+    const human = tsDate.toLocaleString();
+    const iso = tsDate.toISOString();
+
+    document.getElementById('timestamp-human').textContent = human;
+    document.getElementById('timestamp-iso').textContent = iso;
+
+    // Wire copy button (only once)
+    if (!copyBtn.dataset.wired) {
+      copyBtn.dataset.wired = 'true';
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(iso).then(() => {
+          copyBtn.textContent = 'Copied!';
+          copyBtn.disabled = true;
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy ISO';
+            copyBtn.disabled = false;
+          }, 1500);
+        });
+      });
+    }
+  }
 
   // ----- Initial load -----
   const [timelineRes, filesRes] = await Promise.all([
@@ -243,12 +323,19 @@
       document.querySelectorAll(`.sidebar-item[data-path="${CSS.escape(path)}"]`).forEach(b => b.classList.add('selected'));
     }
 
+    // Reset timestamp panel state
+    currentVideoFile = null;
+    videoPaused = true;
+
     const video = document.getElementById('preview-video');
     const img = document.getElementById('preview-image');
     const placeholder = document.getElementById('preview-placeholder');
     placeholder.style.display = 'none';
 
     if (type === 'video') {
+      // Store file record for timestamp calculations
+      currentVideoFile = originalFilesByPath[path] || null;
+
       let src = '/media/' + path;
       const trimStart = el.dataset.trimStart;
       const trimEnd = el.dataset.trimEnd;
@@ -273,6 +360,8 @@
       delete video.dataset.trimStart;
       delete video.dataset.trimEnd;
     }
+
+    renderTimestampPanel();
   }
 
   function formatTime(seconds) {
