@@ -117,7 +117,6 @@ class SyncUseCase:
         if entry.kind == "video_segment":
             data["trim_start"] = entry.trim_start
             data["trim_end"] = entry.trim_end
-            data["original_video"] = str(entry.original_video) if entry.original_video else None
         return data
 
     def build_preview(

@@ -61,7 +61,6 @@ def test_build_timeline_inline_image():
     assert seg0.kind == "video_segment"
     assert seg0.trim_start == 0.0
     assert seg0.trim_end == 30.0
-    assert seg0.original_video == video_path
 
     seg1 = vt.segments[1]
     assert seg1.kind == "image"
@@ -72,7 +71,6 @@ def test_build_timeline_inline_image():
     assert seg2.kind == "video_segment"
     assert seg2.trim_start == 30.0
     assert seg2.trim_end == 120.0
-    assert seg2.original_video == video_path
 
     assert len(result.all_entries) == 3
     assert result.all_entries[0].kind == "video_segment"

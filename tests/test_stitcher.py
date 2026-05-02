@@ -263,7 +263,6 @@ def test_generate_plan_video_segment():
         duration_seconds=10.0,
         kind="video_segment",
         source_path=Path("/videos/clip.mp4"),
-        original_video=Path("/videos/clip.mp4"),
         trim_start=5.0,
         trim_end=15.0,
     )
@@ -275,7 +274,6 @@ def test_generate_plan_video_segment():
     t = plan["timeline"][0]
     assert t["kind"] == "video_segment"
     assert t["source"] == "/videos/clip.mp4"
-    assert t["original_video"] == "/videos/clip.mp4"
     assert t["trim_start"] == 5.0
     assert t["trim_end"] == 15.0
     assert len(plan["ffmpeg_commands"]) == 2  # split + concat

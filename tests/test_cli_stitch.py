@@ -17,7 +17,6 @@ def _make_mock_timeline():
         duration_seconds=120.0,
         kind="video_segment",
         source_path=Path("video.mp4"),
-        original_video=Path("video.mp4"),
         trim_start=0.0,
         trim_end=120.0,
     )

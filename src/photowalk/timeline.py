@@ -24,7 +24,6 @@ class TimelineEntry:
     kind: Literal["video", "image", "video_segment"]
     source_path: Path
     clip_path: Optional[Path] = None
-    original_video: Optional[Path] = None
     trim_start: Optional[float] = None
     trim_end: Optional[float] = None
 
@@ -87,7 +86,6 @@ def _make_video_segments(
                     duration_seconds=image_offset - current_offset,
                     kind="video_segment",
                     source_path=video_path,
-                    original_video=video_path,
                     trim_start=current_offset,
                     trim_end=image_offset,
                 )
@@ -105,7 +103,6 @@ def _make_video_segments(
                 duration_seconds=duration_seconds - current_offset,
                 kind="video_segment",
                 source_path=video_path,
-                original_video=video_path,
                 trim_start=current_offset,
                 trim_end=duration_seconds,
             )

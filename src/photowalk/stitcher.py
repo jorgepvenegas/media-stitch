@@ -188,7 +188,6 @@ def generate_plan(
                 "duration": image_duration,
                 "kind": "image",
                 "source": str(entry.source_path),
-                "original_video": None,
                 "trim_start": None,
                 "trim_end": None,
             })
@@ -226,7 +225,6 @@ def generate_plan(
                 "duration": entry.duration_seconds,
                 "kind": "video_segment",
                 "source": str(entry.source_path),
-                "original_video": str(entry.original_video) if entry.original_video else None,
                 "trim_start": entry.trim_start,
                 "trim_end": entry.trim_end,
             })

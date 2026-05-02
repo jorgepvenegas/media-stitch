@@ -55,9 +55,6 @@ class WebSession:
             if entry.kind == "video_segment":
                 data["trim_start"] = entry.trim_start
                 data["trim_end"] = entry.trim_end
-                data["original_video"] = (
-                    str(entry.original_video) if entry.original_video else None
-                )
             entries.append(data)
         result = {"entries": entries, "settings": {"image_duration": dur}}
         if self.scan_path is not None:

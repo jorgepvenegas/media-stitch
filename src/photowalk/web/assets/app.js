@@ -697,7 +697,6 @@
       html += `<div class="details-row"><span class="label">Trim start</span>${trimStart}</div>`;
       html += `<div class="details-row"><span class="label">Trim end</span>${trimEnd}</div>`;
       html += `<div class="details-row"><span class="label">Segment duration</span>${segDur}</div>`;
-      html += '<div class="sub-header source">Source video</div>';
     }
 
     if (file.type === 'photo') {

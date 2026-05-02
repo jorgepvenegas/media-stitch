@@ -26,7 +26,6 @@ def test_api_timeline():
         duration_seconds=45.0,
         kind="video_segment",
         source_path=Path("/tmp/video.mp4"),
-        original_video=Path("/tmp/video.mp4"),
         trim_start=0.0,
         trim_end=45.0,
     )
