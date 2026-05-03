@@ -165,7 +165,7 @@ onUnmounted(() => {
             v-for="pos in positions"
             :key="pos.entry.source_path"
             :x="pos.x" :y="tl.PADDING" :width="pos.width" :height="tl.BAR_HEIGHT" rx="3"
-            :class="['cursor-pointer stroke-white stroke-[1px]', pos.entry.kind === 'image' ? 'fill-image-bar' : 'fill-video-bar']"
+            :class="['cursor-pointer', pos.entry.kind === 'image' ? 'fill-image-bar' : 'fill-video-bar', store.selectedPath === pos.entry.source_path ? 'stroke-yellow-400 stroke-2' : 'stroke-white stroke-1']"
             @click="selectTimelineBar(pos.entry)"
           />
           <template v-for="pos in positions" :key="'label-' + pos.entry.source_path">
