@@ -1,0 +1,34 @@
+<h2>Migration Strategy</h2>
+<p class="subtitle">How to migrate without breaking everything at once?</p>
+
+<div class="options">
+  <div class="option" data-choice="parallel" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Parallel app</h3>
+      <p>New Vue app in `src/photowalk/web/vue-app/`. Keep old `assets/` serving at different endpoint. Flip routing once Vue is complete.</p>
+      <p style="margin-top:8px;color:#888;font-size:12px;">✅ No risk to existing app<br>❌ Duplicated backend wiring<br>❌ Two things to maintain</p>
+    </div>
+  </div>
+  <div class="option" data-choice="gradual" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Gradual component swap</h3>
+      <p>Build Vue app alongside old app.js. Swap one panel at a time — sidebar first, then sync, then timeline. Old app.js shrinks as Vue grows.</p>
+      <p style="margin-top:8px;color:#888;font-size:12px;">✅ Incremental, visible progress<br>✅ Can test each panel independently<br>❌ Hybrid state during transition</p>
+    </div>
+  </div>
+  <div class="option" data-choice="big-bang" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Big bang rewrite</h3>
+      <p>Build full Vue app in `vue-app/`. Only swap when 100% feature-complete. Old app.js deleted at swap.</p>
+      <p style="margin-top:8px;color:#888;font-size:12px;">✅ Clean break, no hybrid state<br>✅ Full Vue benefits from day one<br>❌ Long time without visible payoff</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;padding:12px;background:#1e2a4a;border-radius:6px;font-size:12px;color:#888;">
+  <strong style="color:#ccc;">My recommendation: B (Gradual swap)</strong><br>
+  Lets you validate the Vue approach incrementally. Panel-by-panel means you can rollback one panel without losing everything.
+</div>

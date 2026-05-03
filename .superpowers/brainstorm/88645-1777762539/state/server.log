@@ -1,0 +1,7 @@
+{"type":"server-started","port":51452,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:51452","screen_dir":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/content","state_dir":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/state"}
+{"type":"screen-added","file":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/content/current-state.html"}
+{"type":"screen-added","file":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/content/component-boundaries.html"}
+{"source":"user-event","type":"click","text":"A\n    \n      Feature-based (3 panels)\n      PreviewPanel — video player + timestamp panel\n      SyncPanel — offset input, queue, apply button\n      TimelinePanel — sidebar, timeline SVG, axis, details\n      Each panel manages its own sub-state. Shared state via Pinia.","choice":"video-centric","id":null,"timestamp":1777762677869}
+{"type":"screen-added","file":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/content/migration-strategy.html"}
+{"type":"screen-added","file":"/Users/jorge/code/photo-walk/.superpowers/brainstorm/88645-1777762539/content/waiting.html"}
+{"type":"server-stopped","reason":"idle timeout"}

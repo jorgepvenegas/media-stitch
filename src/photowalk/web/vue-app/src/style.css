@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e0e0e0;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    color: inherit;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply bg-panel border border-[#444] px-2.5 py-1 cursor-pointer text-sm hover:bg-[#3a4a6a] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-panel rounded;
+    color: #e0e0e0;
+  }
+  .btn-primary {
+    @apply bg-video-bar border-video-bar text-white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    @apply bg-blue-600 border-blue-600;
+  }
+  .input-field {
+    @apply bg-surface border border-[#333] px-2 py-1 font-mono flex-1 min-w-[200px] rounded focus:border-blue-400 focus:outline-none;
+    color: #e0e0e0;
+  }
+}
