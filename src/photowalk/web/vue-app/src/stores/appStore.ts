@@ -30,6 +30,8 @@ export const useAppStore = defineStore('app', () => {
   const selectedSource = ref<'sidebar' | 'timeline' | null>(null)
   const renderStatus = ref<RenderStatus>({ state: 'idle', message: '' })
   const currentVideoFile = ref<FileRecord | null>(null)
+  const trimStart = ref<number | undefined>()
+  const trimEnd = ref<number | undefined>()
   const isPlaying = ref(false)
   const currentTime = ref(0)
   const scanPath = ref<string | null>(null)
@@ -53,9 +55,11 @@ export const useAppStore = defineStore('app', () => {
   })
 
   // ─── Actions ───
-  function selectFile(path: string, source: 'sidebar' | 'timeline') {
+  function selectFile(path: string, source: 'sidebar' | 'timeline', tStart?: number, tEnd?: number) {
     selectedPath.value = path
     selectedSource.value = source
+    trimStart.value = tStart
+    trimEnd.value = tEnd
     const fileSource = previewIsCurrent.value
       ? lastPreviewFiles.value
       : files.value
@@ -86,6 +90,8 @@ export const useAppStore = defineStore('app', () => {
     selectedPath.value = null
     selectedSource.value = null
     currentVideoFile.value = null
+    trimStart.value = undefined
+    trimEnd.value = undefined
   }
 
   function addToQueue(entry: OffsetEntry) {
@@ -214,7 +220,7 @@ export const useAppStore = defineStore('app', () => {
     files, originalFilesByPath, selection, pendingStack,
     previewIsCurrent, lastPreviewFiles, timelineEntries,
     timelineSettings, selectedPath, selectedSource,
-    renderStatus, currentVideoFile, isPlaying, currentTime, scanPath,
+    renderStatus, currentVideoFile, trimStart, trimEnd, isPlaying, currentTime, scanPath,
     // Computed
     filesWithTimestamp, selectionCount, hasPendingOffsets, shiftedFiles, selectedFile,
     // Actions

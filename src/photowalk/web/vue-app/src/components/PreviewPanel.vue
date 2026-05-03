@@ -7,8 +7,8 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const imageRef = ref<HTMLImageElement | null>(null)
 const copied = ref(false)
 
-const trimStart = computed(() => store.currentVideoFile?.trim_start)
-const trimEnd = computed(() => store.currentVideoFile?.trim_end)
+const trimStart = computed(() => store.trimStart)
+const trimEnd = computed(() => store.trimEnd)
 
 const playbackTimestamp = computed(() => {
   if (!store.currentVideoFile || !store.currentVideoFile.timestamp) return null

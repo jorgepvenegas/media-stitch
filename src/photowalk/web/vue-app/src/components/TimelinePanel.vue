@@ -67,7 +67,7 @@ function entryLabel(entry: TimelineEntry): string {
 }
 
 function selectTimelineBar(entry: TimelineEntry) {
-  store.selectFile(entry.source_path, 'timeline')
+  store.selectFile(entry.source_path, 'timeline', entry.trim_start, entry.trim_end)
   selectedEntry.value = entry
 }
 
