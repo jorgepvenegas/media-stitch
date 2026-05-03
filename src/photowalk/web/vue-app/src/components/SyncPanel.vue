@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useAppStore } from '@/stores/appStore'
 import { useApi } from '@/composables/useApi'
 import { useToast } from '@/composables/useToast'
-import type { OffsetSource, DurationSource, ReferenceSource } from '@/types'
+import type { OffsetSource } from '@/types'
 
 const store = useAppStore()
 const api = useApi()
 const toast = useToast()
 
-const syncMode = ref<'duration' | 'reference'>('duration')
 const durationInput = ref('')
-const refWrong = ref('')
-const refCorrect = ref('')
 const parseError = ref('')
 
 // Modal state
@@ -29,49 +26,16 @@ const renderMargin = ref(15)
 const renderOpenFolder = ref(false)
 let renderPollInterval: ReturnType<typeof setInterval> | null = null
 
-// Listen for "use as correct" events from PreviewPanel
-function handleUseRefEvent(e: Event) {
-  const detail = (e as CustomEvent).detail as string
-  syncMode.value = 'reference'
-  refCorrect.value = detail
-}
-
-onMounted(() => {
-  window.addEventListener('use-ref-timestamp', handleUseRefEvent)
-})
-onUnmounted(() => {
-  window.removeEventListener('use-ref-timestamp', handleUseRefEvent)
-})
-
-// Populate refWrong when selected file changes
-watch(() => store.selectedPath, (path) => {
-  if (path) {
-    const file = store.originalFilesByPath[path]
-    if (file?.timestamp) {
-      refWrong.value = file.timestamp
-    }
-  }
-})
-
-const canAddToQueue = computed(() => {
-  if (syncMode.value === 'duration') return durationInput.value.trim().length > 0
-  return refWrong.value.trim().length > 0 && refCorrect.value.trim().length > 0
-})
+const canAddToQueue = computed(() => durationInput.value.trim().length > 0)
 
 const canUpdateTimeline = computed(() => store.hasPendingOffsets)
 const canApply = computed(() => store.hasPendingOffsets && store.previewIsCurrent)
 
 function getSource(): OffsetSource | null {
   parseError.value = ''
-  if (syncMode.value === 'duration') {
-    const text = durationInput.value.trim()
-    if (!text) { parseError.value = 'Enter a duration'; return null }
-    return { kind: 'duration', text }
-  }
-  const wrong = refWrong.value.trim()
-  const correct = refCorrect.value.trim()
-  if (!wrong || !correct) { parseError.value = 'Enter both timestamps'; return null }
-  return { kind: 'reference', wrong, correct }
+  const text = durationInput.value.trim()
+  if (!text) { parseError.value = 'Enter a duration'; return null }
+  return { kind: 'duration', text }
 }
 
 async function addToQueue() {
@@ -214,25 +178,9 @@ const renderFormatOptions = [
   <div class="bg-panel border-b border-[#333] px-4 py-3 flex flex-col gap-1.5">
     <h3 class="text-sm">Sync</h3>
 
-    <!-- Mode toggle -->
-    <div class="flex gap-4 items-center flex-wrap">
-      <label class="text-sm cursor-pointer">
-        <input type="radio" :checked="syncMode === 'duration'" @change="syncMode = 'duration'" class="mr-1"> Duration
-      </label>
-      <label class="text-sm cursor-pointer">
-        <input type="radio" :checked="syncMode === 'reference'" @change="syncMode = 'reference'" class="mr-1"> Reference pair
-      </label>
-    </div>
-
     <!-- Duration input -->
-    <div v-if="syncMode === 'duration'" class="flex gap-2 items-center flex-wrap">
+    <div class="flex gap-2 items-center flex-wrap">
       <input v-model="durationInput" class="input-field" placeholder="-8h23m5s">
-    </div>
-
-    <!-- Reference input -->
-    <div v-if="syncMode === 'reference'" class="flex gap-2 items-center flex-wrap">
-      <input v-model="refWrong" class="input-field" placeholder="wrong: 2026-04-27T23:28:01+00:00">
-      <input v-model="refCorrect" class="input-field" placeholder="correct: 2026-04-27T07:05:00">
     </div>
 
     <div v-if="parseError" class="text-error text-sm">{{ parseError }}</div>
@@ -242,7 +190,7 @@ const renderFormatOptions = [
       <button class="btn" @click="store.selectAll('video')">All videos</button>
       <button class="btn" @click="store.selectAll('photo')">All photos</button>
       <button class="btn" @click="store.clearSelection()">Clear</button>
-      <span class="text-muted text-sm">{{ store.selectionCount }} of {{ store.filesWithTimestamp.length }} files selected</span>
+      <span class="text-muted text-sm">{{ store.selectionCount }} selected</span>
     </div>
 
     <!-- Add to queue -->
@@ -253,11 +201,7 @@ const renderFormatOptions = [
       <div v-if="store.pendingStack.length === 0" class="text-muted italic">No pending offsets</div>
       <div v-for="(entry, idx) in store.pendingStack" :key="entry.id" class="flex justify-between py-0.5 px-1">
         <span class="text-xs">
-          {{ idx + 1 }}. {{
-            entry.source.kind === 'duration'
-              ? entry.source.text
-              : `ref ${entry.delta_seconds >= 0 ? '+' : ''}${Math.round(entry.delta_seconds)}s`
-          }} → {{
+          {{ idx + 1 }}. {{ entry.source.text }} → {{
             entry.target_paths.length === 1
               ? entry.target_paths[0].split('/').pop()
               : `${entry.target_paths.length} files`

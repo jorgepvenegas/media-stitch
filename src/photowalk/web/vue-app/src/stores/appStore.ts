@@ -35,6 +35,7 @@ export const useAppStore = defineStore('app', () => {
   const isPlaying = ref(false)
   const currentTime = ref(0)
   const scanPath = ref<string | null>(null)
+  const selectedTimelineEntry = ref<TimelineEntry | null>(null)
 
   // ─── Computed ───
   const filesWithTimestamp = computed(() =>
@@ -87,11 +88,7 @@ export const useAppStore = defineStore('app', () => {
 
   function clearSelection() {
     selection.value.clear()
-    selectedPath.value = null
-    selectedSource.value = null
-    currentVideoFile.value = null
-    trimStart.value = undefined
-    trimEnd.value = undefined
+    selectedTimelineEntry.value = null
   }
 
   function addToQueue(entry: OffsetEntry) {
@@ -192,6 +189,7 @@ export const useAppStore = defineStore('app', () => {
       })
       pendingStack.value = []
       selection.value.clear()
+      selectedTimelineEntry.value = null
       previewIsCurrent.value = false
       selectedPath.value = null
       selectedSource.value = null
@@ -221,6 +219,7 @@ export const useAppStore = defineStore('app', () => {
     previewIsCurrent, lastPreviewFiles, timelineEntries,
     timelineSettings, selectedPath, selectedSource,
     renderStatus, currentVideoFile, trimStart, trimEnd, isPlaying, currentTime, scanPath,
+    selectedTimelineEntry,
     // Computed
     filesWithTimestamp, selectionCount, hasPendingOffsets, shiftedFiles, selectedFile,
     // Actions

@@ -28,7 +28,6 @@ const mediaUrl = computed(() => {
 function handleLoadedMetadata() {
   const video = videoRef.value
   if (!video) return
-  // Seek to trim start if defined
   const s = trimStart.value
   if (s !== undefined) {
     video.currentTime = s
@@ -39,7 +38,6 @@ function handleTimeUpdate() {
   const video = videoRef.value
   if (!video) return
   store.setPlaybackState(true, video.currentTime)
-  // Enforce trim end — pause immediately when reached
   const e = trimEnd.value
   if (e !== undefined && video.currentTime >= e) {
     video.pause()
@@ -51,7 +49,6 @@ function handleTimeUpdate() {
 function handleSeeking() {
   const video = videoRef.value
   if (!video) return
-  // Clamp seeking within trim bounds
   const s = trimStart.value
   const e = trimEnd.value
   if (s !== undefined && video.currentTime < s) video.currentTime = s
@@ -68,17 +65,26 @@ function copyTimestamp() {
   copied.value = true
   setTimeout(() => { copied.value = false }, 1500)
 }
-
-function useRefAsCorrect() {
-  if (!playbackTimestamp.value) return
-  window.dispatchEvent(new CustomEvent('use-ref-timestamp', {
-    detail: playbackTimestamp.value.toISOString(),
-  }))
-}
 </script>
 
 <template>
   <div class="flex flex-row h-[40vh] bg-surface border-b border-[#333]">
+    <!-- Timestamp panel (left side) -->
+    <div class="w-[220px] min-w-[220px] bg-panel border-r border-[#333] flex flex-col items-center justify-center p-4">
+      <div class="text-center w-full">
+        <div v-if="!store.selectedPath || store.currentVideoFile?.type !== 'video' || store.isPlaying" class="text-muted italic text-sm">
+          {{ store.isPlaying ? 'Playing...' : 'Select a video to see timestamp' }}
+        </div>
+        <div v-else>
+          <div class="text-[0.7rem] uppercase tracking-wide text-muted mb-1">Current timestamp</div>
+          <hr class="border-[#333] my-2">
+          <div class="text-base mb-1">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
+          <div class="text-sm text-muted font-mono mb-3">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
+          <button class="w-full btn" @click="copyTimestamp">{{ copied ? 'Copied!' : 'Copy ISO' }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Media display -->
     <div class="flex-1 flex items-center justify-center overflow-hidden">
       <video
@@ -93,23 +99,6 @@ function useRefAsCorrect() {
         class="max-w-full max-h-full object-contain"
       />
       <div v-else class="text-muted text-xl">Select an item to preview</div>
-    </div>
-
-    <!-- Timestamp panel -->
-    <div class="w-[220px] min-w-[220px] bg-panel border-l border-[#333] flex flex-col items-center justify-center p-4">
-      <div class="text-center w-full">
-        <div v-if="!store.selectedPath || store.currentVideoFile?.type !== 'video' || store.isPlaying" class="text-muted italic text-sm">
-          {{ store.isPlaying ? 'Playing...' : 'Select a video to see timestamp' }}
-        </div>
-        <div v-else>
-          <div class="text-[0.7rem] uppercase tracking-wide text-muted mb-1">Current timestamp</div>
-          <hr class="border-[#333] my-2">
-          <div class="text-base mb-1">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
-          <div class="text-sm text-muted font-mono mb-3">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
-          <button class="w-full btn mb-2" @click="copyTimestamp">{{ copied ? 'Copied!' : 'Copy ISO' }}</button>
-          <button class="w-full btn btn-primary" @click="useRefAsCorrect">Use as correct</button>
-        </div>
-      </div>
     </div>
   </div>
 </template>

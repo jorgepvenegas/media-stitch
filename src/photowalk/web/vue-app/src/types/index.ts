@@ -41,8 +41,7 @@ export interface TimelineSettings {
 // ─── Offset Entry (matches sync_models.py OffsetEntry) ───
 
 export type DurationSource = { kind: 'duration'; text: string }
-export type ReferenceSource = { kind: 'reference'; wrong: string; correct: string }
-export type OffsetSource = DurationSource | ReferenceSource
+export type OffsetSource = DurationSource
 
 export interface OffsetEntry {
   id: string
