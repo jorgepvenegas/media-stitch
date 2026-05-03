@@ -22,21 +22,24 @@ const shouldShowImage = computed(() => store.selectedFile?.type === 'photo')
 
 const mediaUrl = computed(() => {
   if (!store.selectedFile) return ''
-  let url = `/media/${store.selectedFile.path}`
-  if (store.selectedFile.type === 'video') {
-    const s = trimStart.value
-    const e = trimEnd.value
-    if (s !== undefined && e !== undefined) {
-      url += `#t=${s},${e}`
-    }
-  }
-  return url
+  return `/media/${store.selectedFile.path}`
 })
+
+function handleLoadedMetadata() {
+  const video = videoRef.value
+  if (!video) return
+  // Seek to trim start if defined
+  const s = trimStart.value
+  if (s !== undefined) {
+    video.currentTime = s
+  }
+}
 
 function handleTimeUpdate() {
   const video = videoRef.value
   if (!video) return
   store.setPlaybackState(true, video.currentTime)
+  // Enforce trim end — pause immediately when reached
   const e = trimEnd.value
   if (e !== undefined && video.currentTime >= e) {
     video.pause()
@@ -48,17 +51,11 @@ function handleTimeUpdate() {
 function handleSeeking() {
   const video = videoRef.value
   if (!video) return
+  // Clamp seeking within trim bounds
   const s = trimStart.value
   const e = trimEnd.value
   if (s !== undefined && video.currentTime < s) video.currentTime = s
   if (e !== undefined && video.currentTime > e) video.currentTime = e
-}
-
-function handleLoadedMetadata() {
-  const video = videoRef.value
-  if (!video) return
-  const s = trimStart.value
-  if (s !== undefined) video.currentTime = s
 }
 
 function handlePlay() { store.setPlaybackState(true, videoRef.value?.currentTime ?? 0) }
