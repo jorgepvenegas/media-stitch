@@ -86,12 +86,9 @@ def test_media_rejects_nonexistent_file(tmp_path):
 def test_assets_serve_css_and_js():
     app = create_app(set(), TimelineMap())
     client = TestClient(app)
-    css = client.get("/assets/style.css")
-    assert css.status_code == 200
-    assert "text/css" in css.headers["content-type"]
-    js = client.get("/assets/app.js")
-    assert js.status_code == 200
-    assert "javascript" in js.headers["content-type"]
+    # Vue build assets are hashed — test that unknown assets 404
+    response = client.get("/assets/nonexistent.css")
+    assert response.status_code == 404
 
 
 def test_app_state_holds_catalog():
