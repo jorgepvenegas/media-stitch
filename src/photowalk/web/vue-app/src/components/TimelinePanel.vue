@@ -50,6 +50,20 @@ function basename(path: string): string {
   return path.split('/').pop() || ''
 }
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function entryLabel(entry: TimelineEntry): string {
+  let name = basename(entry.source_path)
+  if (entry.kind === 'video_segment' && entry.trim_start != null && entry.trim_end != null) {
+    name = `${name} [${formatTime(entry.trim_start)}–${formatTime(entry.trim_end)}]`
+  }
+  return name.length > 30 ? name.slice(0, 28) + '…' : name
+}
+
 function selectTimelineBar(entry: TimelineEntry) {
   store.selectFile(entry.source_path, 'timeline')
 }
@@ -174,7 +188,7 @@ onUnmounted(() => {
               :x="pos.x + 4" :y="tl.PADDING + tl.BAR_HEIGHT / 2"
               class="fill-white text-[11px] pointer-events-none"
               dominant-baseline="middle"
-            >{{ basename(pos.entry.source_path).length > 30 ? basename(pos.entry.source_path).slice(0, 28) + '…' : basename(pos.entry.source_path) }}</text>
+            >{{ entryLabel(pos.entry) }}</text>
           </template>
         </svg>
       </div>
