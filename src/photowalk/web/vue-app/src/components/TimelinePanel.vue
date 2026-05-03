@@ -11,6 +11,7 @@ const imageDuration = ref(3.5)
 const timelineScale = ref(50)
 const svgContainer = ref<HTMLDivElement | null>(null)
 const containerWidth = ref(1000)
+const selectedEntry = ref<TimelineEntry | null>(null)
 
 const positions = computed(() =>
   tl.computeLayout(store.timelineEntries, imageDuration.value, timelineScale.value)
@@ -44,6 +45,7 @@ function formatDateTime(iso: string | null): string {
 
 function selectSidebarFile(f: FileRecord) {
   store.selectFile(f.path, 'sidebar')
+  selectedEntry.value = null
 }
 
 function basename(path: string): string {
@@ -66,6 +68,7 @@ function entryLabel(entry: TimelineEntry): string {
 
 function selectTimelineBar(entry: TimelineEntry) {
   store.selectFile(entry.source_path, 'timeline')
+  selectedEntry.value = entry
 }
 
 function getNudgeDelta(): string {
@@ -220,6 +223,27 @@ onUnmounted(() => {
               <button class="btn" @click="nudge(-1)">←</button>
               <span class="text-accent text-sm font-mono min-w-[36px] text-center">{{ getNudgeDelta() }}</span>
               <button class="btn" @click="nudge(1)">→</button>
+            </div>
+          </div>
+
+          <!-- Segment info (timeline selection with trim data) -->
+          <div v-if="selectedEntry?.kind === 'video_segment'" class="mb-4">
+            <h4 class="text-[0.7rem] uppercase tracking-wide text-muted mb-1.5">This segment</h4>
+            <div class="flex justify-between text-sm py-0.5 gap-2">
+              <span class="text-muted">Start on timeline</span>
+              <span class="text-right">{{ formatDateTime(selectedEntry.start_time) }}</span>
+            </div>
+            <div class="flex justify-between text-sm py-0.5 gap-2">
+              <span class="text-muted">Trim start</span>
+              <span class="text-right">{{ selectedEntry.trim_start != null ? formatTime(selectedEntry.trim_start) + 's' : '—' }}</span>
+            </div>
+            <div class="flex justify-between text-sm py-0.5 gap-2">
+              <span class="text-muted">Trim end</span>
+              <span class="text-right">{{ selectedEntry.trim_end != null ? formatTime(selectedEntry.trim_end) + 's' : '—' }}</span>
+            </div>
+            <div class="flex justify-between text-sm py-0.5 gap-2">
+              <span class="text-muted">Segment duration</span>
+              <span class="text-right">{{ selectedEntry.duration_seconds != null ? selectedEntry.duration_seconds.toFixed(2) + 's' : '—' }}</span>
             </div>
           </div>
 
