@@ -107,7 +107,7 @@ function useRefAsCorrect() {
         <div v-else>
           <div class="text-[0.7rem] uppercase tracking-wide text-muted mb-1">Current timestamp</div>
           <hr class="border-[#333] my-2">
-          <div class="text-base text-text mb-1">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
+          <div class="text-base mb-1">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
           <div class="text-sm text-muted font-mono mb-3">{{ playbackTimestamp?.toISOString() ?? '' }}</div>
           <button class="w-full btn mb-2" @click="copyTimestamp">{{ copied ? 'Copied!' : 'Copy ISO' }}</button>
           <button class="w-full btn btn-primary" @click="useRefAsCorrect">Use as correct</button>

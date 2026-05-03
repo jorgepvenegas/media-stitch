@@ -6,7 +6,7 @@ import Toast from './components/Toast.vue'
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-app-bg text-text overflow-hidden">
+  <div class="flex flex-col h-screen bg-app-bg overflow-hidden">
     <PreviewPanel />
     <SyncPanel />
     <TimelinePanel />

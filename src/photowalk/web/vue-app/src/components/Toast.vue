@@ -11,7 +11,7 @@ const { toast, dismiss } = useToast()
       :class="toast.isError ? 'bg-panel border-error' : 'bg-panel border-[#444]'"
     >
       <div class="flex items-start justify-between gap-2">
-        <pre class="whitespace-pre-wrap text-sm text-text">{{ toast.message }}</pre>
+        <pre class="whitespace-pre-wrap text-sm">{{ toast.message }}</pre>
         <button v-if="toast.sticky" class="text-muted bg-transparent border-none cursor-pointer text-lg" @click="dismiss">×</button>
       </div>
     </div>

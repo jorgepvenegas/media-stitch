@@ -128,7 +128,7 @@ onUnmounted(() => {
             class="mt-0.5 cursor-pointer"
           />
           <div class="flex-1 min-w-0">
-            <div class="whitespace-nowrap overflow-hidden text-ellipsis text-text">
+            <div class="whitespace-nowrap overflow-hidden text-ellipsis">
               {{ f.type === 'video' ? '🎬' : '📷' }} {{ basename(f.path) }}
               <span v-if="f.shifted" class="inline-block bg-accent text-app-bg text-[0.65rem] px-1 py-0.5 rounded ml-1.5">shifted</span>
             </div>
@@ -147,14 +147,14 @@ onUnmounted(() => {
         <div class="flex items-center gap-1.5 text-sm text-[#ccc]">
           <label>Photo duration:</label>
           <input type="number" v-model.number="imageDuration" step="0.1" min="0.1"
-                 class="w-14 px-1.5 py-0.5 text-sm bg-[#2a2a2a] border border-[#444] rounded text-text text-right focus:border-blue-400 focus:outline-none"
+                 class="w-14 px-1.5 py-0.5 text-sm bg-[#2a2a2a] border border-[#444] rounded text-right focus:border-blue-400 focus:outline-none"
                  @change="onImageDurationChange">
           <span>s</span>
         </div>
         <div class="flex items-center gap-1.5 text-sm text-[#ccc]">
-          <button class="bg-[#2a2a2a] border border-[#444] rounded text-text cursor-pointer px-2 min-w-[28px] hover:bg-[#3a3a3a]" @click="zoomOut">−</button>
+          <button class="bg-[#2a2a2a] border border-[#444] rounded cursor-pointer px-2 min-w-[28px] hover:bg-[#3a3a3a]" @click="zoomOut">−</button>
           <span class="min-w-[42px] text-center">{{ zoomPct }}</span>
-          <button class="bg-[#2a2a2a] border border-[#444] rounded text-text cursor-pointer px-2 min-w-[28px] hover:bg-[#3a3a3a]" @click="zoomIn">+</button>
+          <button class="bg-[#2a2a2a] border border-[#444] rounded cursor-pointer px-2 min-w-[28px] hover:bg-[#3a3a3a]" @click="zoomIn">+</button>
         </div>
       </div>
 
@@ -214,15 +214,15 @@ onUnmounted(() => {
             <h4 class="text-[0.7rem] uppercase tracking-wide text-muted mb-1.5">File</h4>
             <div class="flex justify-between text-sm py-0.5 gap-2">
               <span class="text-muted">Name</span>
-              <span class="text-text text-right"><strong>{{ basename(selectedFile.path) }}</strong></span>
+              <span class="text-right"><strong>{{ basename(selectedFile.path) }}</strong></span>
             </div>
             <div class="flex justify-between text-sm py-0.5 gap-2">
               <span class="text-muted">Type</span>
-              <span class="text-text text-right">{{ selectedFile.type }}</span>
+              <span class="text-right">{{ selectedFile.type }}</span>
             </div>
             <div class="flex flex-col gap-0.5 text-sm">
               <span class="text-muted">Path</span>
-              <span class="text-text font-mono text-xs break-all w-full">{{ selectedFile.path }}</span>
+              <span class="font-mono text-xs break-all w-full">{{ selectedFile.path }}</span>
             </div>
           </div>
 
@@ -236,7 +236,7 @@ onUnmounted(() => {
             <template v-if="selectedFile.type === 'photo'">
               <div class="flex justify-between text-sm py-0.5 gap-2">
                 <span class="text-muted">Captured</span>
-                <span class="text-text text-right">
+                <span class="text-right">
                   <template v-if="shiftedFileForDetails">
                     <span class="text-muted line-through mr-1">{{ formatDateTime(selectedFile.timestamp) }}</span>
                     <span class="text-accent">→</span>
@@ -249,7 +249,7 @@ onUnmounted(() => {
             <template v-else>
               <div class="flex justify-between text-sm py-0.5 gap-2">
                 <span class="text-muted">Start</span>
-                <span class="text-text text-right">
+                <span class="text-right">
                   <template v-if="shiftedFileForDetails">
                     <span class="text-muted line-through mr-1">{{ formatDateTime(selectedFile.timestamp) }}</span>
                     <span class="text-accent">→</span>
@@ -260,7 +260,7 @@ onUnmounted(() => {
               </div>
               <div class="flex justify-between text-sm py-0.5 gap-2">
                 <span class="text-muted">End</span>
-                <span class="text-text text-right">
+                <span class="text-right">
                   <template v-if="shiftedFileForDetails">
                     <span class="text-muted line-through mr-1">{{ formatDateTime(selectedFile.end_timestamp ?? null) }}</span>
                     <span class="text-accent">→</span>
@@ -271,7 +271,7 @@ onUnmounted(() => {
               </div>
               <div class="flex justify-between text-sm py-0.5 gap-2">
                 <span class="text-muted">Duration</span>
-                <span class="text-text text-right">{{ selectedFile.duration_seconds != null ? selectedFile.duration_seconds.toFixed(2) + 's' : '—' }}</span>
+                <span class="text-right">{{ selectedFile.duration_seconds != null ? selectedFile.duration_seconds.toFixed(2) + 's' : '—' }}</span>
               </div>
             </template>
           </div>
@@ -281,16 +281,16 @@ onUnmounted(() => {
             <template v-if="selectedFile.camera_model || selectedFile.shutter_speed || selectedFile.iso != null">
               <h4 class="text-[0.7rem] uppercase tracking-wide text-muted mb-1.5">Camera</h4>
               <div v-if="selectedFile.camera_model" class="flex justify-between text-sm py-0.5 gap-2">
-                <span class="text-muted">Camera</span><span class="text-text text-right">{{ selectedFile.camera_model }}</span>
+                <span class="text-muted">Camera</span><span class="text-right">{{ selectedFile.camera_model }}</span>
               </div>
               <div v-if="selectedFile.shutter_speed" class="flex justify-between text-sm py-0.5 gap-2">
-                <span class="text-muted">Shutter</span><span class="text-text text-right">{{ selectedFile.shutter_speed }}</span>
+                <span class="text-muted">Shutter</span><span class="text-right">{{ selectedFile.shutter_speed }}</span>
               </div>
               <div v-if="selectedFile.iso != null" class="flex justify-between text-sm py-0.5 gap-2">
-                <span class="text-muted">ISO</span><span class="text-text text-right">{{ selectedFile.iso }}</span>
+                <span class="text-muted">ISO</span><span class="text-right">{{ selectedFile.iso }}</span>
               </div>
               <div v-if="selectedFile.focal_length" class="flex justify-between text-sm py-0.5 gap-2">
-                <span class="text-muted">Focal length</span><span class="text-text text-right">{{ selectedFile.focal_length }}</span>
+                <span class="text-muted">Focal length</span><span class="text-right">{{ selectedFile.focal_length }}</span>
               </div>
             </template>
           </div>

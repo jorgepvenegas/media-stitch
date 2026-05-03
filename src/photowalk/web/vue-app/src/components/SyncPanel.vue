@@ -349,7 +349,7 @@ const renderFormatOptions = [
           <!-- Render progress -->
           <div v-else class="text-center py-5">
             <div class="w-10 h-10 border-[3px] border-[#333] border-t-video-bar rounded-full animate-spin mx-auto mb-3"></div>
-            <p class="text-text">{{ store.renderStatus.message || 'Stitching...' }}</p>
+            <p class="">{{ store.renderStatus.message || 'Stitching...' }}</p>
             <button class="btn mt-3" @click="cancelRender">Cancel</button>
           </div>
         </div>
